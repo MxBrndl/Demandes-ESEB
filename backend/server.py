@@ -2,7 +2,7 @@ from fastapi import FastAPI, HTTPException, Depends, status, Form, File, UploadF
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.responses import FileResponse
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, validator
 from pymongo import MongoClient
 from typing import Optional, List
 import os
@@ -10,6 +10,7 @@ import hashlib
 import jwt
 import uuid
 import json
+import re
 from datetime import datetime, timedelta
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import letter
@@ -52,7 +53,7 @@ class UserCreate(BaseModel):
     password: str
     first_name: str
     last_name: str
-    role: str = "student"  # student, teacher, admin
+    role: str = "user"  # user, admin
 
 class UserLogin(BaseModel):
     email: EmailStr
@@ -60,15 +61,8 @@ class UserLogin(BaseModel):
 
 class DeviceRequest(BaseModel):
     user_id: str
-    request_type: str  # "student", "teacher"
     devices: List[str]  # ["ipad", "macbook", "apple_pencil"]
     application_requirements: str
-    
-    # Student specific fields
-    parent_first_name: Optional[str] = None
-    parent_last_name: Optional[str] = None
-    parent_phone: Optional[str] = None
-    parent_email: Optional[EmailStr] = None
     
     # Contact info
     phone: Optional[str] = None
@@ -79,6 +73,17 @@ class RequestUpdate(BaseModel):
     device_serial_numbers: Optional[dict] = None
     device_asset_tags: Optional[dict] = None
     admin_notes: Optional[str] = None
+    
+    @validator('device_asset_tags')
+    def validate_asset_tags(cls, v):
+        if v is None:
+            return v
+        
+        pattern = re.compile(r'^H\d{5}$')
+        for device, tag in v.items():
+            if tag and not pattern.match(tag):
+                raise ValueError(f'Asset tag pour {device} doit être au format H12345 (H suivi de 5 chiffres)')
+        return v
 
 # Helper functions
 def hash_password(password: str) -> str:
@@ -125,8 +130,7 @@ def send_to_topdesk(request_data: dict):
             "briefDescription": f"Demande d'appareil - {', '.join(request_data.get('devices', []))}",
             "request": f"Demande d'appareil éducatif:\n"
                       f"Appareils: {', '.join(request_data.get('devices', []))}\n"
-                      f"Exigences: {request_data.get('application_requirements', '')}\n"
-                      f"Type: {request_data.get('request_type', '')}"
+                      f"Exigences: {request_data.get('application_requirements', '')}"
         }
         
         response = requests.post(TOPDESK_WEBHOOK_URL, json=incident_data, timeout=10)
@@ -157,7 +161,7 @@ def generate_pdf_report(request_data: dict, user_data: dict) -> bytes:
         ["ID de demande:", request_data.get("_id", "")],
         ["Date de demande:", request_data.get("created_at", "")],
         ["Statut:", request_data.get("status", "")],
-        ["Type de demandeur:", request_data.get("request_type", "").title()],
+        ["Type d'utilisateur:", "Administrateur" if user_data.get("role") == "admin" else "Utilisateur"],
     ]
     
     story.append(Paragraph("INFORMATIONS DE LA DEMANDE", styles['Heading2']))
@@ -182,14 +186,6 @@ def generate_pdf_report(request_data: dict, user_data: dict) -> bytes:
         ["Téléphone:", request_data.get("phone", "N/A")],
         ["Adresse:", request_data.get("address", "N/A")],
     ]
-    
-    # Add parent info for students
-    if request_data.get("request_type") == "student":
-        user_info.extend([
-            ["Nom du parent:", f"{request_data.get('parent_first_name', '')} {request_data.get('parent_last_name', '')}"],
-            ["Email du parent:", request_data.get("parent_email", "N/A")],
-            ["Téléphone du parent:", request_data.get("parent_phone", "N/A")],
-        ])
     
     story.append(Paragraph("INFORMATIONS PERSONNELLES", styles['Heading2']))
     table2 = Table(user_info)
@@ -228,7 +224,7 @@ def generate_pdf_report(request_data: dict, user_data: dict) -> bytes:
             device_details.append([device.replace("_", " ").title(), serial, asset_tag])
         
         if device_details:
-            device_table = Table([["Appareil", "Numéro de série", "Tag d'actif"]] + device_details)
+            device_table = Table([["Appareil", "Numéro de série", "Asset Tag"]] + device_details)
             device_table.setStyle(TableStyle([
                 ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
                 ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
@@ -329,7 +325,6 @@ async def create_request(request_data: DeviceRequest, token_data: dict = Depends
     request_doc = {
         "_id": request_id,
         "user_id": token_data["user_id"],
-        "request_type": request_data.request_type,
         "devices": request_data.devices,
         "application_requirements": request_data.application_requirements,
         "phone": request_data.phone,
@@ -338,15 +333,6 @@ async def create_request(request_data: DeviceRequest, token_data: dict = Depends
         "created_at": datetime.utcnow().isoformat(),
         "updated_at": datetime.utcnow().isoformat()
     }
-    
-    # Add parent info for students
-    if request_data.request_type == "student":
-        request_doc.update({
-            "parent_first_name": request_data.parent_first_name,
-            "parent_last_name": request_data.parent_last_name,
-            "parent_phone": request_data.parent_phone,
-            "parent_email": request_data.parent_email
-        })
     
     requests_collection.insert_one(request_doc)
     
@@ -374,7 +360,8 @@ async def get_requests(token_data: dict = Depends(verify_token)):
                 request["user_info"] = {
                     "email": user["email"],
                     "first_name": user["first_name"],
-                    "last_name": user["last_name"]
+                    "last_name": user["last_name"],
+                    "role": user["role"]
                 }
     else:
         # Users can only see their own requests
@@ -398,7 +385,8 @@ async def get_request(request_id: str, token_data: dict = Depends(verify_token))
         request["user_info"] = {
             "email": user["email"],
             "first_name": user["first_name"],
-            "last_name": user["last_name"]
+            "last_name": user["last_name"],
+            "role": user["role"]
         }
     
     return request
@@ -408,6 +396,17 @@ async def update_request(request_id: str, update_data: RequestUpdate, token_data
     request = requests_collection.find_one({"_id": request_id})
     if not request:
         raise HTTPException(status_code=404, detail="Request not found")
+    
+    # Validate serial numbers for iPad and MacBook when approving/preparing
+    if update_data.status in ['approuve', 'prepare'] and update_data.device_serial_numbers:
+        for device in request.get('devices', []):
+            if device in ['ipad', 'macbook']:
+                serial = update_data.device_serial_numbers.get(device)
+                if not serial or not serial.strip():
+                    raise HTTPException(
+                        status_code=400, 
+                        detail=f"Numéro de série obligatoire pour {device.title()} lors de l'approbation/préparation"
+                    )
     
     # Update request
     update_fields = {

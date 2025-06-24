@@ -24,7 +24,7 @@ function App() {
         headers: { Authorization: `Bearer ${token}` }
       });
       setCurrentUser(response.data);
-      setCurrentView(response.data.role === 'admin' ? 'admin_dashboard' : 'user_dashboard');
+      setCurrentView(response.data.role === 'admin' ? 'dashboard' : 'my_requests');
     } catch (error) {
       localStorage.removeItem('token');
       setCurrentView('login');
@@ -73,17 +73,18 @@ function App() {
           />
         )}
 
-        {currentView === 'user_dashboard' && currentUser && (
-          <UserDashboard 
+        {currentView === 'my_requests' && currentUser && (
+          <MyRequestsView 
             currentUser={currentUser}
             setCurrentView={setCurrentView}
             setError={setError}
           />
         )}
 
-        {currentView === 'admin_dashboard' && currentUser && (
+        {currentView === 'dashboard' && currentUser && currentUser.role === 'admin' && (
           <AdminDashboard 
             currentUser={currentUser}
+            setCurrentView={setCurrentView}
             setError={setError}
           />
         )}
@@ -124,32 +125,32 @@ const Navigation = ({ currentUser, currentView, setCurrentView, logout }) => {
                   Bonjour, {currentUser.first_name}
                 </span>
                 <span className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium">
-                  {currentUser.role === 'admin' ? 'Administrateur' : 
-                   currentUser.role === 'teacher' ? 'Enseignant' : 'Étudiant'}
+                  {currentUser.role === 'admin' ? 'Administrateur' : 'Utilisateur'}
                 </span>
-                {currentUser.role === 'admin' ? (
+                
+                <button
+                  onClick={() => setCurrentView('my_requests')}
+                  className={`font-medium ${currentView === 'my_requests' ? 'text-blue-600' : 'text-gray-600 hover:text-blue-600'}`}
+                >
+                  Mes demandes
+                </button>
+                
+                <button
+                  onClick={() => setCurrentView('new_request')}
+                  className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  Nouvelle demande
+                </button>
+
+                {currentUser.role === 'admin' && (
                   <button
-                    onClick={() => setCurrentView('admin_dashboard')}
-                    className="text-blue-600 hover:text-blue-800 font-medium"
+                    onClick={() => setCurrentView('dashboard')}
+                    className={`font-medium ${currentView === 'dashboard' ? 'text-blue-600' : 'text-gray-600 hover:text-blue-600'}`}
                   >
-                    Dashboard
+                    Gestion des demandes
                   </button>
-                ) : (
-                  <>
-                    <button
-                      onClick={() => setCurrentView('user_dashboard')}
-                      className="text-blue-600 hover:text-blue-800 font-medium"
-                    >
-                      Mes demandes
-                    </button>
-                    <button
-                      onClick={() => setCurrentView('new_request')}
-                      className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
-                    >
-                      Nouvelle demande
-                    </button>
-                  </>
                 )}
+                
                 <button
                   onClick={logout}
                   className="text-red-600 hover:text-red-800 font-medium"
@@ -196,7 +197,7 @@ const LoginForm = ({ setCurrentUser, setCurrentView, setError, loading, setLoadi
       const response = await axios.post(`${API_BASE_URL}/api/login`, formData);
       localStorage.setItem('token', response.data.token);
       setCurrentUser(response.data.user);
-      setCurrentView(response.data.user.role === 'admin' ? 'admin_dashboard' : 'user_dashboard');
+      setCurrentView(response.data.user.role === 'admin' ? 'dashboard' : 'my_requests');
     } catch (error) {
       setError(error.response?.data?.detail || 'Erreur de connexion');
     } finally {
@@ -270,7 +271,7 @@ const RegisterForm = ({ setCurrentUser, setCurrentView, setError, loading, setLo
     password: '',
     first_name: '',
     last_name: '',
-    role: 'student'
+    role: 'user'
   });
 
   const handleSubmit = async (e) => {
@@ -282,7 +283,7 @@ const RegisterForm = ({ setCurrentUser, setCurrentView, setError, loading, setLo
       const response = await axios.post(`${API_BASE_URL}/api/register`, formData);
       localStorage.setItem('token', response.data.token);
       setCurrentUser(response.data.user);
-      setCurrentView(response.data.user.role === 'admin' ? 'admin_dashboard' : 'user_dashboard');
+      setCurrentView(response.data.user.role === 'admin' ? 'dashboard' : 'my_requests');
     } catch (error) {
       setError(error.response?.data?.detail || 'Erreur d\'inscription');
     } finally {
@@ -362,8 +363,7 @@ const RegisterForm = ({ setCurrentUser, setCurrentView, setError, loading, setLo
               onChange={(e) => setFormData({...formData, role: e.target.value})}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             >
-              <option value="student">Étudiant</option>
-              <option value="teacher">Enseignant</option>
+              <option value="user">Utilisateur</option>
               <option value="admin">Administrateur</option>
             </select>
           </div>
@@ -394,15 +394,10 @@ const RegisterForm = ({ setCurrentUser, setCurrentView, setError, loading, setLo
 // Request Form Component
 const RequestForm = ({ currentUser, setCurrentView, setError }) => {
   const [formData, setFormData] = useState({
-    request_type: currentUser.role === 'teacher' ? 'teacher' : 'student',
     devices: [],
     application_requirements: '',
     phone: '',
-    address: '',
-    parent_first_name: '',
-    parent_last_name: '',
-    parent_phone: '',
-    parent_email: ''
+    address: ''
   });
   const [loading, setLoading] = useState(false);
 
@@ -431,7 +426,7 @@ const RequestForm = ({ currentUser, setCurrentView, setError }) => {
       });
       
       alert('Demande soumise avec succès!');
-      setCurrentView('user_dashboard');
+      setCurrentView('my_requests');
     } catch (error) {
       setError(error.response?.data?.detail || 'Erreur lors de la soumission');
     } finally {
@@ -522,69 +517,10 @@ const RequestForm = ({ currentUser, setCurrentView, setError }) => {
             </div>
           </div>
 
-          {/* Parent Information for Students */}
-          {formData.request_type === 'student' && (
-            <div className="border-t pt-6">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">
-                Informations des parents/tuteurs
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Prénom du parent *
-                  </label>
-                  <input
-                    type="text"
-                    required={formData.request_type === 'student'}
-                    value={formData.parent_first_name}
-                    onChange={(e) => setFormData({...formData, parent_first_name: e.target.value})}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Nom du parent *
-                  </label>
-                  <input
-                    type="text"
-                    required={formData.request_type === 'student'}
-                    value={formData.parent_last_name}
-                    onChange={(e) => setFormData({...formData, parent_last_name: e.target.value})}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Téléphone du parent
-                  </label>
-                  <input
-                    type="tel"
-                    value={formData.parent_phone}
-                    onChange={(e) => setFormData({...formData, parent_phone: e.target.value})}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="+352 XX XX XX XX"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Email du parent
-                  </label>
-                  <input
-                    type="email"
-                    value={formData.parent_email}
-                    onChange={(e) => setFormData({...formData, parent_email: e.target.value})}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="parent@exemple.com"
-                  />
-                </div>
-              </div>
-            </div>
-          )}
-
           <div className="flex space-x-4">
             <button
               type="button"
-              onClick={() => setCurrentView('user_dashboard')}
+              onClick={() => setCurrentView('my_requests')}
               className="flex-1 bg-gray-300 text-gray-700 py-2 px-4 rounded-lg hover:bg-gray-400 transition-colors font-medium"
             >
               Annuler
@@ -603,8 +539,8 @@ const RequestForm = ({ currentUser, setCurrentView, setError }) => {
   );
 };
 
-// User Dashboard Component
-const UserDashboard = ({ currentUser, setCurrentView, setError }) => {
+// My Requests View Component
+const MyRequestsView = ({ currentUser, setCurrentView, setError }) => {
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -739,13 +675,6 @@ const UserDashboard = ({ currentUser, setCurrentView, setError }) => {
                       ))}
                     </div>
                   </div>
-
-                  <div>
-                    <h4 className="font-medium text-gray-900 mb-2">Type de demande:</h4>
-                    <span className="px-3 py-1 bg-gray-100 text-gray-800 rounded-full text-sm">
-                      {request.request_type === 'student' ? 'Étudiant' : 'Enseignant'}
-                    </span>
-                  </div>
                 </div>
 
                 {request.application_requirements && (
@@ -765,6 +694,29 @@ const UserDashboard = ({ currentUser, setCurrentView, setError }) => {
                     </p>
                   </div>
                 )}
+
+                {/* Show device details if available */}
+                {(request.device_serial_numbers || request.device_asset_tags) && (
+                  <div className="mt-4">
+                    <h4 className="font-medium text-gray-900 mb-2">Détails des appareils:</h4>
+                    <div className="bg-green-50 p-3 rounded border-l-4 border-green-400">
+                      {request.devices.map(device => {
+                        const serial = request.device_serial_numbers?.[device];
+                        const assetTag = request.device_asset_tags?.[device];
+                        if (serial || assetTag) {
+                          return (
+                            <div key={device} className="text-sm mb-2">
+                              <strong>{device.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}:</strong>
+                              {serial && <span className="ml-2">N° série: {serial}</span>}
+                              {assetTag && <span className="ml-2">Asset Tag: {assetTag}</span>}
+                            </div>
+                          );
+                        }
+                        return null;
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           ))}
@@ -775,7 +727,7 @@ const UserDashboard = ({ currentUser, setCurrentView, setError }) => {
 };
 
 // Admin Dashboard Component
-const AdminDashboard = ({ currentUser, setError }) => {
+const AdminDashboard = ({ currentUser, setCurrentView, setError }) => {
   const [requests, setRequests] = useState([]);
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -831,7 +783,7 @@ const AdminDashboard = ({ currentUser, setError }) => {
       setSelectedRequest(null);
       alert('Demande mise à jour avec succès!');
     } catch (error) {
-      setError('Erreur lors de la mise à jour');
+      setError(error.response?.data?.detail || 'Erreur lors de la mise à jour');
     }
   };
 
@@ -873,7 +825,15 @@ const AdminDashboard = ({ currentUser, setError }) => {
 
   return (
     <div className="space-y-6">
-      <h2 className="text-2xl font-bold text-gray-900">Dashboard Administrateur</h2>
+      <div className="flex justify-between items-center">
+        <h2 className="text-2xl font-bold text-gray-900">Gestion des Demandes</h2>
+        <button
+          onClick={() => setCurrentView('new_request')}
+          className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium"
+        >
+          + Nouvelle demande
+        </button>
+      </div>
 
       {/* Stats */}
       {stats && (
@@ -940,9 +900,6 @@ const AdminDashboard = ({ currentUser, setError }) => {
                   Appareils
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Type
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Date
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -964,6 +921,9 @@ const AdminDashboard = ({ currentUser, setError }) => {
                       <div className="text-sm text-gray-500">
                         {request.user_info?.email}
                       </div>
+                      <div className="text-xs text-blue-600">
+                        {request.user_info?.role === 'admin' ? 'Administrateur' : 'Utilisateur'}
+                      </div>
                     </div>
                   </td>
                   <td className="px-6 py-4">
@@ -977,9 +937,6 @@ const AdminDashboard = ({ currentUser, setError }) => {
                         </span>
                       ))}
                     </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {request.request_type === 'student' ? 'Étudiant' : 'Enseignant'}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     {new Date(request.created_at).toLocaleDateString('fr-FR')}
@@ -1033,8 +990,23 @@ const RequestManagementModal = ({ request, onClose, onUpdate }) => {
     }));
   };
 
+  const validateAssetTag = (tag) => {
+    const pattern = /^H\d{5}$/;
+    return !tag || pattern.test(tag);
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
+    
+    // Validate asset tags
+    for (const device in deviceInfo.assetTags) {
+      const tag = deviceInfo.assetTags[device];
+      if (tag && !validateAssetTag(tag)) {
+        alert(`Asset Tag pour ${device} doit être au format H12345 (H suivi de 5 chiffres)`);
+        return;
+      }
+    }
+    
     onUpdate(request._id, status, deviceInfo, adminNotes);
   };
 
@@ -1062,11 +1034,14 @@ const RequestManagementModal = ({ request, onClose, onUpdate }) => {
                 <div>
                   <span className="font-medium">Demandeur:</span><br />
                   {request.user_info?.first_name} {request.user_info?.last_name}<br />
-                  {request.user_info?.email}
+                  {request.user_info?.email}<br />
+                  <span className="text-blue-600">
+                    {request.user_info?.role === 'admin' ? 'Administrateur' : 'Utilisateur'}
+                  </span>
                 </div>
                 <div>
-                  <span className="font-medium">Type:</span><br />
-                  {request.request_type === 'student' ? 'Étudiant' : 'Enseignant'}
+                  <span className="font-medium">Date:</span><br />
+                  {new Date(request.created_at).toLocaleDateString('fr-FR')}
                 </div>
               </div>
               <div className="mt-2">
@@ -1099,7 +1074,7 @@ const RequestManagementModal = ({ request, onClose, onUpdate }) => {
             </div>
 
             {/* Device Details */}
-            {(status === 'prepare' || status === 'contacte' || status === 'termine') && (
+            {(status === 'approuve' || status === 'prepare' || status === 'contacte' || status === 'termine') && (
               <div>
                 <h4 className="font-medium text-gray-900 mb-3">Détails des appareils</h4>
                 {request.devices.map(device => (
@@ -1110,10 +1085,11 @@ const RequestManagementModal = ({ request, onClose, onUpdate }) => {
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Numéro de série
+                          Numéro de série {(device === 'ipad' || device === 'macbook') && '*'}
                         </label>
                         <input
                           type="text"
+                          required={(device === 'ipad' || device === 'macbook') && (status === 'approuve' || status === 'prepare')}
                           value={deviceInfo.serialNumbers[device] || ''}
                           onChange={(e) => handleDeviceInfoChange(device, 'serialNumbers', e.target.value)}
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -1122,15 +1098,23 @@ const RequestManagementModal = ({ request, onClose, onUpdate }) => {
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Tag d'actif
+                          Asset Tag (Format: H12345)
                         </label>
                         <input
                           type="text"
                           value={deviceInfo.assetTags[device] || ''}
                           onChange={(e) => handleDeviceInfoChange(device, 'assetTags', e.target.value)}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                          placeholder="Entrez le tag d'actif"
+                          className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                            deviceInfo.assetTags[device] && !validateAssetTag(deviceInfo.assetTags[device])
+                              ? 'border-red-500 bg-red-50'
+                              : 'border-gray-300'
+                          }`}
+                          placeholder="H12345"
+                          pattern="H\d{5}"
                         />
+                        {deviceInfo.assetTags[device] && !validateAssetTag(deviceInfo.assetTags[device]) && (
+                          <p className="text-red-600 text-xs mt-1">Format requis: H suivi de 5 chiffres (ex: H12345)</p>
+                        )}
                       </div>
                     </div>
                   </div>
