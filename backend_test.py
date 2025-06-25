@@ -179,13 +179,15 @@ class ESEBAPITester:
             "status": "approuve",
             "device_asset_tags": {
                 "ipad": "H12345",
-                "apple_pencil": "H67890"
+                "macbook": "H67890",
+                "apple_pencil": "H11111"
             },
             "device_serial_numbers": {
                 "ipad": "IPAD123456789",
+                "macbook": "MACBOOK987654321",
                 "apple_pencil": ""
             },
-            "admin_notes": "Demande approuvée avec asset tags valides."
+            "admin_notes": "Demande approuvée avec asset tags valides et numéros de série pour iPad et MacBook."
         }
         
         success, response = self.run_test(
