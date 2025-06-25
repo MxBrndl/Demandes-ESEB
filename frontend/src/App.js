@@ -445,7 +445,7 @@ const RequestForm = ({ currentUser, setCurrentView, setError }) => {
     beneficiaire: {
       nom: '',
       prenom: '',
-      date_naissance: '',
+      matricule: '',
       ecole: '',
       classe: '',
       qualite_ebs: 'EBS',
