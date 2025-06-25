@@ -224,14 +224,13 @@ class ESEBAPITester:
             "Update request with invalid asset tag",
             "PUT",
             f"requests/{request_id}",
-            400,  # Expecting error
+            422,  # Expecting validation error (422 Unprocessable Entity)
             data=data,
             token=self.admin_token
         )
         
-        # This test passes if it fails with status 400
-        if not success and response.get('detail', '').find('Asset tag') >= 0:
-            self.tests_passed += 1
+        # This test passes if it fails with status 422
+        if success and 'detail' in response and any('Asset tag' in str(error) for error in response.get('detail', [])):
             print(f"✅ Correctly rejected invalid asset tag format")
             return True
         
