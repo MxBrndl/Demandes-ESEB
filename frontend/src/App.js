@@ -110,10 +110,10 @@ const Navigation = ({ currentUser, currentView, setCurrentView, logout }) => {
           <div className="flex items-center space-x-4">
             <div className="flex items-center">
               <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-lg">E</span>
+                <span className="text-white font-bold text-lg">🏛️</span>
               </div>
               <h1 className="ml-3 text-2xl font-bold text-gray-900">
-                Demandes ESEB
+                Demandes EBS - Luxembourg
               </h1>
             </div>
           </div>
@@ -271,7 +271,10 @@ const RegisterForm = ({ setCurrentUser, setCurrentView, setError, loading, setLo
     password: '',
     first_name: '',
     last_name: '',
-    role: 'user'
+    role: 'user',
+    fonction: '',
+    adresse_complete: '',
+    telephone: ''
   });
 
   const handleSubmit = async (e) => {
@@ -292,17 +295,17 @@ const RegisterForm = ({ setCurrentUser, setCurrentView, setError, loading, setLo
   };
 
   return (
-    <div className="max-w-md mx-auto bg-white rounded-xl shadow-lg overflow-hidden">
+    <div className="max-w-2xl mx-auto bg-white rounded-xl shadow-lg overflow-hidden">
       <div className="px-8 py-6">
         <h2 className="text-2xl font-bold text-center text-gray-900 mb-6">
-          Inscription
+          Inscription - Centre EBS Luxembourg
         </h2>
         
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Prénom
+                Prénom *
               </label>
               <input
                 type="text"
@@ -314,7 +317,7 @@ const RegisterForm = ({ setCurrentUser, setCurrentView, setError, loading, setLo
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Nom
+                Nom *
               </label>
               <input
                 type="text"
@@ -328,7 +331,7 @@ const RegisterForm = ({ setCurrentUser, setCurrentView, setError, loading, setLo
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Email
+              Email *
             </label>
             <input
               type="email"
@@ -342,7 +345,7 @@ const RegisterForm = ({ setCurrentUser, setCurrentView, setError, loading, setLo
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Mot de passe
+              Mot de passe *
             </label>
             <input
               type="password"
@@ -351,6 +354,45 @@ const RegisterForm = ({ setCurrentUser, setCurrentView, setError, loading, setLo
               onChange={(e) => setFormData({...formData, password: e.target.value})}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               placeholder="Choisissez un mot de passe"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Fonction
+            </label>
+            <input
+              type="text"
+              value={formData.fonction}
+              onChange={(e) => setFormData({...formData, fonction: e.target.value})}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              placeholder="ex: Gestionnaire administratif, Enseignant..."
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Adresse complète
+            </label>
+            <input
+              type="text"
+              value={formData.adresse_complete}
+              onChange={(e) => setFormData({...formData, adresse_complete: e.target.value})}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              placeholder="ex: 5, rue Thomas Edison - L-1445 Strassen"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Téléphone
+            </label>
+            <input
+              type="tel"
+              value={formData.telephone}
+              onChange={(e) => setFormData({...formData, telephone: e.target.value})}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              placeholder="ex: (+352) 247-65868"
             />
           </div>
 
@@ -397,7 +439,18 @@ const RequestForm = ({ currentUser, setCurrentView, setError }) => {
     devices: [],
     application_requirements: '',
     phone: '',
-    address: ''
+    address: '',
+    lieu_reception: 'Centre Technolink',
+    duree_fin_disposition: 'Fin d\'année scolaire',
+    beneficiaire: {
+      nom: '',
+      prenom: '',
+      date_naissance: '',
+      ecole: '',
+      classe: '',
+      qualite_ebs: 'EBS',
+      personne_reference: ''
+    }
   });
   const [loading, setLoading] = useState(false);
 
@@ -406,6 +459,16 @@ const RequestForm = ({ currentUser, setCurrentView, setError }) => {
       ? formData.devices.filter(d => d !== device)
       : [...formData.devices, device];
     setFormData({...formData, devices: newDevices});
+  };
+
+  const handleBeneficiaireChange = (field, value) => {
+    setFormData({
+      ...formData,
+      beneficiaire: {
+        ...formData.beneficiaire,
+        [field]: value
+      }
+    });
   };
 
   const handleSubmit = async (e) => {
@@ -419,13 +482,23 @@ const RequestForm = ({ currentUser, setCurrentView, setError }) => {
       return;
     }
 
+    // Validate beneficiaire required fields
+    const requiredFields = ['nom', 'prenom', 'ecole'];
+    for (let field of requiredFields) {
+      if (!formData.beneficiaire[field]) {
+        setError(`Le champ ${field} du bénéficiaire est requis`);
+        setLoading(false);
+        return;
+      }
+    }
+
     try {
       const token = localStorage.getItem('token');
       const response = await axios.post(`${API_BASE_URL}/api/requests`, formData, {
         headers: { Authorization: `Bearer ${token}` }
       });
       
-      alert('Demande soumise avec succès!');
+      alert('Demande EBS soumise avec succès!');
       setCurrentView('my_requests');
     } catch (error) {
       setError(error.response?.data?.detail || 'Erreur lors de la soumission');
@@ -435,21 +508,117 @@ const RequestForm = ({ currentUser, setCurrentView, setError }) => {
   };
 
   return (
-    <div className="max-w-2xl mx-auto bg-white rounded-xl shadow-lg overflow-hidden">
+    <div className="max-w-4xl mx-auto bg-white rounded-xl shadow-lg overflow-hidden">
       <div className="px-8 py-6">
         <h2 className="text-2xl font-bold text-center text-gray-900 mb-6">
-          Nouvelle Demande d'Appareil
+          🏛️ Nouvelle Demande EBS - Ville de Luxembourg
         </h2>
         
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit} className="space-y-8">
+          
+          {/* Au profit de section */}
+          <div className="border-2 border-green-200 bg-green-50 p-6 rounded-lg">
+            <h3 className="text-lg font-bold text-gray-900 mb-4 text-green-800">
+              👤 Au profit de (Bénéficiaire)
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Nom *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={formData.beneficiaire.nom}
+                  onChange={(e) => handleBeneficiaireChange('nom', e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Prénom *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={formData.beneficiaire.prenom}
+                  onChange={(e) => handleBeneficiaireChange('prenom', e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Date de naissance
+                </label>
+                <input
+                  type="date"
+                  value={formData.beneficiaire.date_naissance}
+                  onChange={(e) => handleBeneficiaireChange('date_naissance', e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  École *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={formData.beneficiaire.ecole}
+                  onChange={(e) => handleBeneficiaireChange('ecole', e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="Nom de l'école"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Classe
+                </label>
+                <input
+                  type="text"
+                  value={formData.beneficiaire.classe}
+                  onChange={(e) => handleBeneficiaireChange('classe', e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="ex: 6e année"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Qualité EBS
+                </label>
+                <select
+                  value={formData.beneficiaire.qualite_ebs}
+                  onChange={(e) => handleBeneficiaireChange('qualite_ebs', e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  <option value="EBS">EBS</option>
+                  <option value="ESS">ESS</option>
+                  <option value="ESEB">ESEB</option>
+                </select>
+              </div>
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Personne de référence
+                </label>
+                <input
+                  type="text"
+                  value={formData.beneficiaire.personne_reference}
+                  onChange={(e) => handleBeneficiaireChange('personne_reference', e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="Nom de la personne de référence"
+                />
+              </div>
+            </div>
+          </div>
+
           {/* Device Selection */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-3">
-              Appareils demandés *
-            </label>
+          <div className="border-2 border-blue-200 bg-blue-50 p-6 rounded-lg">
+            <h3 className="text-lg font-bold text-gray-900 mb-4 text-blue-800">
+              💻 Matériel informatique souhaité *
+            </h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {[
-                { id: 'ipad', name: 'iPad', icon: '📱' },
+                { id: 'ipad', name: 'iPad avec clavier ergonomique', icon: '📱' },
                 { id: 'macbook', name: 'MacBook', icon: '💻' },
                 { id: 'apple_pencil', name: 'Apple Pencil', icon: '✏️' }
               ].map(device => (
@@ -457,7 +626,7 @@ const RequestForm = ({ currentUser, setCurrentView, setError }) => {
                   key={device.id}
                   className={`flex items-center p-4 border-2 rounded-lg cursor-pointer transition-colors ${
                     formData.devices.includes(device.id)
-                      ? 'border-blue-500 bg-blue-50'
+                      ? 'border-blue-500 bg-blue-100'
                       : 'border-gray-200 hover:border-gray-300'
                   }`}
                 >
@@ -468,7 +637,7 @@ const RequestForm = ({ currentUser, setCurrentView, setError }) => {
                     className="sr-only"
                   />
                   <span className="text-2xl mr-3">{device.icon}</span>
-                  <span className="font-medium">{device.name}</span>
+                  <span className="font-medium text-sm">{device.name}</span>
                 </label>
               ))}
             </div>
@@ -477,7 +646,7 @@ const RequestForm = ({ currentUser, setCurrentView, setError }) => {
           {/* Application Requirements */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Exigences d'application *
+              📋 Applications ou logiciels installés *
             </label>
             <textarea
               required
@@ -485,15 +654,43 @@ const RequestForm = ({ currentUser, setCurrentView, setError }) => {
               onChange={(e) => setFormData({...formData, application_requirements: e.target.value})}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               rows="4"
-              placeholder="Décrivez vos besoins spécifiques pour les applications et l'utilisation des appareils..."
+              placeholder="Décrivez les applications et logiciels nécessaires pour l'usage pédagogique..."
             />
+          </div>
+
+          {/* Logistical Information */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                📍 Lieu de réception du matériel
+              </label>
+              <input
+                type="text"
+                value={formData.lieu_reception}
+                onChange={(e) => setFormData({...formData, lieu_reception: e.target.value})}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="Centre Technolink"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                ⏰ Durée de fin de mise à disposition
+              </label>
+              <input
+                type="text"
+                value={formData.duree_fin_disposition}
+                onChange={(e) => setFormData({...formData, duree_fin_disposition: e.target.value})}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="Fin d'année scolaire"
+              />
+            </div>
           </div>
 
           {/* Contact Information */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Téléphone
+                📞 Téléphone
               </label>
               <input
                 type="tel"
@@ -505,7 +702,7 @@ const RequestForm = ({ currentUser, setCurrentView, setError }) => {
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Adresse
+                🏠 Adresse
               </label>
               <input
                 type="text"
@@ -530,7 +727,7 @@ const RequestForm = ({ currentUser, setCurrentView, setError }) => {
               disabled={loading}
               className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors font-medium"
             >
-              {loading ? 'Soumission...' : 'Soumettre la demande'}
+              {loading ? 'Soumission...' : 'Soumettre la demande EBS'}
             </button>
           </div>
         </form>
@@ -591,7 +788,7 @@ const MyRequestsView = ({ currentUser, setCurrentView, setError }) => {
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `demande_${requestId}.pdf`;
+      a.download = `EBS_demande_${requestId}.pdf`;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
@@ -612,49 +809,54 @@ const MyRequestsView = ({ currentUser, setCurrentView, setError }) => {
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold text-gray-900">Mes Demandes</h2>
+        <h2 className="text-2xl font-bold text-gray-900">🏛️ Mes Demandes EBS</h2>
         <button
           onClick={() => setCurrentView('new_request')}
           className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium"
         >
-          + Nouvelle demande
+          + Nouvelle demande EBS
         </button>
       </div>
 
       {requests.length === 0 ? (
         <div className="bg-white rounded-xl shadow-lg p-8 text-center">
-          <div className="text-6xl mb-4">📱</div>
-          <h3 className="text-xl font-medium text-gray-900 mb-2">Aucune demande</h3>
+          <div className="text-6xl mb-4">🏛️</div>
+          <h3 className="text-xl font-medium text-gray-900 mb-2">Aucune demande EBS</h3>
           <p className="text-gray-600 mb-4">
-            Vous n'avez encore soumis aucune demande d'appareil.
+            Vous n'avez encore soumis aucune demande d'appareil EBS.
           </p>
           <button
             onClick={() => setCurrentView('new_request')}
             className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium"
           >
-            Créer ma première demande
+            Créer ma première demande EBS
           </button>
         </div>
       ) : (
         <div className="grid gap-6">
           {requests.map(request => (
-            <div key={request._id} className="bg-white rounded-xl shadow-lg overflow-hidden">
+            <div key={request._id} className="bg-white rounded-xl shadow-lg overflow-hidden border-l-4 border-blue-600">
               <div className="p-6">
                 <div className="flex justify-between items-start mb-4">
                   <div>
                     <h3 className="text-lg font-semibold text-gray-900">
-                      Demande #{request._id.slice(-8)}
+                      Demande EBS #{request._id.slice(-8)}
                     </h3>
                     <p className="text-sm text-gray-600">
                       Soumise le {new Date(request.created_at).toLocaleDateString('fr-FR')}
                     </p>
+                    {request.beneficiaire && (
+                      <p className="text-sm text-blue-600 font-medium">
+                        Pour: {request.beneficiaire.prenom} {request.beneficiaire.nom}
+                      </p>
+                    )}
                   </div>
                   <div className="flex items-center space-x-2">
                     {getStatusBadge(request.status)}
                     <button
                       onClick={() => downloadPDF(request._id)}
-                      className="text-blue-600 hover:text-blue-800"
-                      title="Télécharger PDF"
+                      className="text-blue-600 hover:text-blue-800 text-xl"
+                      title="Télécharger PDF officiel"
                     >
                       📄
                     </button>
@@ -675,11 +877,25 @@ const MyRequestsView = ({ currentUser, setCurrentView, setError }) => {
                       ))}
                     </div>
                   </div>
+
+                  {request.beneficiaire && (
+                    <div>
+                      <h4 className="font-medium text-gray-900 mb-2">École:</h4>
+                      <span className="px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm">
+                        {request.beneficiaire.ecole}
+                      </span>
+                      {request.beneficiaire.classe && (
+                        <span className="ml-2 px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm">
+                          {request.beneficiaire.classe}
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 {request.application_requirements && (
                   <div className="mt-4">
-                    <h4 className="font-medium text-gray-900 mb-2">Exigences:</h4>
+                    <h4 className="font-medium text-gray-900 mb-2">Applications/Logiciels:</h4>
                     <p className="text-gray-700 text-sm bg-gray-50 p-3 rounded">
                       {request.application_requirements}
                     </p>
@@ -688,7 +904,7 @@ const MyRequestsView = ({ currentUser, setCurrentView, setError }) => {
 
                 {request.admin_notes && (
                   <div className="mt-4">
-                    <h4 className="font-medium text-gray-900 mb-2">Notes administratives:</h4>
+                    <h4 className="font-medium text-gray-900 mb-2">Notes du Centre Technolink:</h4>
                     <p className="text-gray-700 text-sm bg-yellow-50 p-3 rounded border-l-4 border-yellow-400">
                       {request.admin_notes}
                     </p>
@@ -781,9 +997,31 @@ const AdminDashboard = ({ currentUser, setCurrentView, setError }) => {
       fetchRequests();
       fetchStats();
       setSelectedRequest(null);
-      alert('Demande mise à jour avec succès!');
+      
+      if (status === 'prepare') {
+        alert('Demande mise à jour avec succès! PDF officiel généré automatiquement.');
+      } else {
+        alert('Demande mise à jour avec succès!');
+      }
     } catch (error) {
       setError(error.response?.data?.detail || 'Erreur lors de la mise à jour');
+    }
+  };
+
+  const deleteRequest = async (requestId) => {
+    if (window.confirm('Êtes-vous sûr de vouloir supprimer cette demande ? Cette action est irréversible.')) {
+      try {
+        const token = localStorage.getItem('token');
+        await axios.delete(`${API_BASE_URL}/api/requests/${requestId}`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        
+        fetchRequests();
+        fetchStats();
+        alert('Demande supprimée avec succès!');
+      } catch (error) {
+        setError(error.response?.data?.detail || 'Erreur lors de la suppression');
+      }
     }
   };
 
@@ -808,7 +1046,8 @@ const AdminDashboard = ({ currentUser, setCurrentView, setError }) => {
     const matchesSearch = 
       request._id.toLowerCase().includes(searchTerm.toLowerCase()) ||
       request.user_info?.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      `${request.user_info?.first_name} ${request.user_info?.last_name}`.toLowerCase().includes(searchTerm.toLowerCase());
+      `${request.user_info?.first_name} ${request.user_info?.last_name}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      `${request.beneficiaire?.prenom} ${request.beneficiaire?.nom}`.toLowerCase().includes(searchTerm.toLowerCase());
     
     const matchesStatus = statusFilter === 'all' || request.status === statusFilter;
     
@@ -826,18 +1065,18 @@ const AdminDashboard = ({ currentUser, setCurrentView, setError }) => {
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold text-gray-900">Gestion des Demandes</h2>
+        <h2 className="text-2xl font-bold text-gray-900">🏛️ Gestion des Demandes EBS</h2>
         <button
           onClick={() => setCurrentView('new_request')}
           className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium"
         >
-          + Nouvelle demande
+          + Nouvelle demande EBS
         </button>
       </div>
 
       {/* Stats */}
       {stats && (
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
           <div className="bg-white p-6 rounded-xl shadow-lg">
             <div className="text-2xl font-bold text-blue-600">{stats.total_requests}</div>
             <div className="text-sm text-gray-600">Total des demandes</div>
@@ -849,6 +1088,10 @@ const AdminDashboard = ({ currentUser, setCurrentView, setError }) => {
           <div className="bg-white p-6 rounded-xl shadow-lg">
             <div className="text-2xl font-bold text-green-600">{stats.approved_requests}</div>
             <div className="text-sm text-gray-600">Approuvées</div>
+          </div>
+          <div className="bg-white p-6 rounded-xl shadow-lg">
+            <div className="text-2xl font-bold text-blue-600">{stats.prepared_requests}</div>
+            <div className="text-sm text-gray-600">Préparées</div>
           </div>
           <div className="bg-white p-6 rounded-xl shadow-lg">
             <div className="text-2xl font-bold text-gray-600">{stats.completed_requests}</div>
@@ -863,7 +1106,7 @@ const AdminDashboard = ({ currentUser, setCurrentView, setError }) => {
           <div className="flex-1">
             <input
               type="text"
-              placeholder="Rechercher par ID, email ou nom..."
+              placeholder="Rechercher par ID, demandeur, bénéficiaire..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -897,6 +1140,9 @@ const AdminDashboard = ({ currentUser, setCurrentView, setError }) => {
                   Demandeur
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Bénéficiaire
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Appareils
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -926,6 +1172,19 @@ const AdminDashboard = ({ currentUser, setCurrentView, setError }) => {
                       </div>
                     </div>
                   </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div>
+                      <div className="text-sm font-medium text-gray-900">
+                        {request.beneficiaire?.prenom} {request.beneficiaire?.nom}
+                      </div>
+                      <div className="text-sm text-gray-500">
+                        {request.beneficiaire?.ecole}
+                      </div>
+                      <div className="text-xs text-green-600">
+                        {request.beneficiaire?.qualite_ebs}
+                      </div>
+                    </div>
+                  </td>
                   <td className="px-6 py-4">
                     <div className="space-y-1">
                       {request.devices.map(device => (
@@ -944,12 +1203,18 @@ const AdminDashboard = ({ currentUser, setCurrentView, setError }) => {
                   <td className="px-6 py-4 whitespace-nowrap">
                     {getStatusBadge(request.status)}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
                     <button
                       onClick={() => setSelectedRequest(request)}
-                      className="text-blue-600 hover:text-blue-900 mr-3"
+                      className="text-blue-600 hover:text-blue-900"
                     >
                       Gérer
+                    </button>
+                    <button
+                      onClick={() => deleteRequest(request._id)}
+                      className="text-red-600 hover:text-red-900"
+                    >
+                      Supprimer
                     </button>
                   </td>
                 </tr>
@@ -1012,11 +1277,11 @@ const RequestManagementModal = ({ request, onClose, onUpdate }) => {
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+      <div className="bg-white rounded-xl shadow-2xl max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto">
         <div className="p-6">
           <div className="flex justify-between items-center mb-6">
             <h3 className="text-xl font-bold text-gray-900">
-              Gérer la demande #{request._id.slice(-8)}
+              🏛️ Gérer la demande EBS #{request._id.slice(-8)}
             </h3>
             <button
               onClick={onClose}
@@ -1028,30 +1293,43 @@ const RequestManagementModal = ({ request, onClose, onUpdate }) => {
 
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Request Info */}
-            <div className="bg-gray-50 p-4 rounded-lg">
-              <h4 className="font-medium text-gray-900 mb-2">Informations de la demande</h4>
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div>
-                  <span className="font-medium">Demandeur:</span><br />
+            <div className="bg-gray-50 p-4 rounded-lg grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <h4 className="font-medium text-gray-900 mb-2">Demandeur:</h4>
+                <p className="text-sm">
                   {request.user_info?.first_name} {request.user_info?.last_name}<br />
                   {request.user_info?.email}<br />
                   <span className="text-blue-600">
                     {request.user_info?.role === 'admin' ? 'Administrateur' : 'Utilisateur'}
                   </span>
-                </div>
-                <div>
-                  <span className="font-medium">Date:</span><br />
-                  {new Date(request.created_at).toLocaleDateString('fr-FR')}
-                </div>
+                </p>
               </div>
-              <div className="mt-2">
-                <span className="font-medium">Appareils:</span><br />
-                {request.devices.map(device => device.replace('_', ' ')).join(', ')}
+              
+              <div>
+                <h4 className="font-medium text-gray-900 mb-2">Bénéficiaire:</h4>
+                <p className="text-sm">
+                  {request.beneficiaire?.prenom} {request.beneficiaire?.nom}<br />
+                  École: {request.beneficiaire?.ecole}<br />
+                  Classe: {request.beneficiaire?.classe}<br />
+                  <span className="text-green-600">EBS: {request.beneficiaire?.qualite_ebs}</span>
+                </p>
               </div>
-              <div className="mt-2">
-                <span className="font-medium">Exigences:</span><br />
-                <p className="text-gray-700 mt-1">{request.application_requirements}</p>
+              
+              <div>
+                <h4 className="font-medium text-gray-900 mb-2">Appareils:</h4>
+                <p className="text-sm">{request.devices.map(device => device.replace('_', ' ')).join(', ')}</p>
               </div>
+              
+              <div>
+                <h4 className="font-medium text-gray-900 mb-2">Date:</h4>
+                <p className="text-sm">{new Date(request.created_at).toLocaleDateString('fr-FR')}</p>
+              </div>
+            </div>
+
+            {/* Applications */}
+            <div className="bg-blue-50 p-4 rounded-lg">
+              <h4 className="font-medium text-gray-900 mb-2">Applications/Logiciels demandés:</h4>
+              <p className="text-gray-700 text-sm">{request.application_requirements}</p>
             </div>
 
             {/* Status */}
@@ -1067,10 +1345,15 @@ const RequestManagementModal = ({ request, onClose, onUpdate }) => {
                 <option value="en_attente">En attente</option>
                 <option value="approuve">Approuvé</option>
                 <option value="refuse">Refusé</option>
-                <option value="prepare">Préparé</option>
+                <option value="prepare">Préparé (génère PDF officiel)</option>
                 <option value="contacte">Contacté</option>
                 <option value="termine">Terminé</option>
               </select>
+              {status === 'prepare' && (
+                <p className="text-blue-600 text-sm mt-1">
+                  ⚠️ Le passage au statut "Préparé" génère automatiquement le PDF officiel EBS.
+                </p>
+              )}
             </div>
 
             {/* Device Details */}
@@ -1125,7 +1408,7 @@ const RequestManagementModal = ({ request, onClose, onUpdate }) => {
             {/* Admin Notes */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Notes administratives
+                Notes du Centre Technolink
               </label>
               <textarea
                 value={adminNotes}

@@ -13,11 +13,13 @@ import json
 import re
 from datetime import datetime, timedelta
 from reportlab.pdfgen import canvas
-from reportlab.lib.pagesizes import letter
+from reportlab.lib.pagesizes import letter, A4
 from reportlab.lib import colors
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib.units import inch
+from reportlab.lib.units import inch, mm
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
 import io
 import requests
 import tempfile
@@ -54,14 +56,35 @@ class UserCreate(BaseModel):
     first_name: str
     last_name: str
     role: str = "user"  # user, admin
+    
+    # Informations demandeur (pour PDF)
+    fonction: Optional[str] = None
+    adresse_complete: Optional[str] = None
+    telephone: Optional[str] = None
 
 class UserLogin(BaseModel):
     email: EmailStr
     password: str
 
+class BeneficiaireInfo(BaseModel):
+    nom: str
+    prenom: str
+    date_naissance: str
+    ecole: str
+    classe: str
+    qualite_ebs: str  # Type de handicap/besoin spécifique
+    personne_reference: Optional[str] = None
+
 class DeviceRequest(BaseModel):
     devices: List[str]  # ["ipad", "macbook", "apple_pencil"]
     application_requirements: str
+    
+    # Informations bénéficiaire (Au profit de)
+    beneficiaire: BeneficiaireInfo
+    
+    # Informations logistiques
+    lieu_reception: Optional[str] = None
+    duree_fin_disposition: Optional[str] = None
     
     # Contact info
     phone: Optional[str] = None
@@ -126,9 +149,11 @@ def send_to_topdesk(request_data: dict):
                 "firstName": request_data.get("first_name"),
                 "lastName": request_data.get("last_name")
             },
-            "briefDescription": f"Demande d'appareil - {', '.join(request_data.get('devices', []))}",
-            "request": f"Demande d'appareil éducatif:\n"
+            "briefDescription": f"Demande d'appareil EBS - {', '.join(request_data.get('devices', []))}",
+            "request": f"Demande d'appareil éducatif EBS:\n"
                       f"Appareils: {', '.join(request_data.get('devices', []))}\n"
+                      f"Bénéficiaire: {request_data.get('beneficiaire', {}).get('prenom', '')} {request_data.get('beneficiaire', {}).get('nom', '')}\n"
+                      f"École: {request_data.get('beneficiaire', {}).get('ecole', '')}\n"
                       f"Exigences: {request_data.get('application_requirements', '')}"
         }
         
@@ -137,104 +162,227 @@ def send_to_topdesk(request_data: dict):
     except Exception as e:
         print(f"Error sending to TopDesk: {e}")
 
-def generate_pdf_report(request_data: dict, user_data: dict) -> bytes:
-    """Generate PDF report for device request"""
+def generate_official_ebs_pdf(request_data: dict, user_data: dict) -> bytes:
+    """Generate official EBS PDF form matching Luxembourg format"""
     buffer = io.BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=letter)
+    
+    # A4 size
+    doc = SimpleDocTemplate(buffer, pagesize=A4, topMargin=20*mm, bottomMargin=20*mm, leftMargin=20*mm, rightMargin=20*mm)
     styles = getSampleStyleSheet()
     story = []
     
+    # Logo placeholder and header
+    header_style = ParagraphStyle(
+        'HeaderStyle',
+        parent=styles['Normal'],
+        fontSize=10,
+        alignment=1,  # Center
+        textColor=colors.black
+    )
+    
+    # Logo de Luxembourg (placeholder)
+    logo_text = Paragraph("🏛️<br/>VILLE DE<br/>LUXEMBOURG", header_style)
+    story.append(logo_text)
+    story.append(Spacer(1, 10*mm))
+    
     # Title
     title_style = ParagraphStyle(
-        'CustomTitle',
+        'TitleStyle',
         parent=styles['Heading1'],
-        fontSize=18,
-        textColor=colors.darkblue,
-        alignment=1  # Center
+        fontSize=14,
+        alignment=1,
+        textColor=colors.white,
+        backColor=colors.blue,
+        borderPadding=5
     )
-    story.append(Paragraph("DEMANDE D'APPAREIL ÉDUCATIF", title_style))
-    story.append(Spacer(1, 20))
     
-    # Request info table
-    request_info = [
-        ["ID de demande:", request_data.get("_id", "")],
-        ["Date de demande:", request_data.get("created_at", "")],
-        ["Statut:", request_data.get("status", "")],
-        ["Type d'utilisateur:", "Administrateur" if user_data.get("role") == "admin" else "Utilisateur"],
+    title = Paragraph("Mise à disposition de matériels informatiques dans le cadre de l'inclusion des élèves à besoins spécifiques (EBS)", title_style)
+    story.append(title)
+    story.append(Spacer(1, 10*mm))
+    
+    # Section Demandeur
+    demandeur_data = [
+        ["Demandeur - Direction de l'enseignement fondamental - Région 1", ""],
+        ["Nom et Prénom", f"{user_data.get('first_name', '')} {user_data.get('last_name', '')}"],
+        ["Fonction", user_data.get('fonction', 'Gestionnaire administratif')],
+        ["Adresse", user_data.get('adresse_complete', '5, rue Thomas Edison - L-1445 Strassen')],
+        ["Téléphone", user_data.get('telephone', '(+352) 247-65868')],
+        ["Email", user_data.get('email', '')],
+        ["Date de la demande", datetime.now().strftime('%d.%m.%Y')]
     ]
     
-    story.append(Paragraph("INFORMATIONS DE LA DEMANDE", styles['Heading2']))
-    table1 = Table(request_info)
-    table1.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (0, -1), colors.lightgrey),
-        ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
-        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-        ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
-        ('FONTSIZE', (0, 0), (-1, -1), 10),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 12),
-        ('BACKGROUND', (1, 0), (1, -1), colors.beige),
-        ('GRID', (0, 0), (-1, -1), 1, colors.black)
+    demandeur_table = Table(demandeur_data, colWidths=[8*cm, 10*cm])
+    demandeur_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.lightgreen),
+        ('BACKGROUND', (0, 1), (0, -1), colors.lightgrey),
+        ('GRID', (0, 0), (-1, -1), 1, colors.black),
+        ('FONTSIZE', (0, 0), (-1, -1), 9),
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
     ]))
-    story.append(table1)
-    story.append(Spacer(1, 20))
+    story.append(demandeur_table)
+    story.append(Spacer(1, 5*mm))
     
-    # User info
-    user_info = [
-        ["Nom:", f"{user_data.get('first_name', '')} {user_data.get('last_name', '')}"],
-        ["Email:", user_data.get("email", "")],
-        ["Téléphone:", request_data.get("phone", "N/A")],
-        ["Adresse:", request_data.get("address", "N/A")],
+    # Section Au profit de
+    beneficiaire = request_data.get('beneficiaire', {})
+    profit_data = [
+        ["Au profit de", ""],
+        ["Nom et Prénom", f"{beneficiaire.get('prenom', '')} {beneficiaire.get('nom', '')}"],
+        ["Qualité EBS (ESS, ESEB)", beneficiaire.get('qualite_ebs', 'EBS')],
+        ["Date de naissance", beneficiaire.get('date_naissance', '')],
+        ["École (si applicable)", beneficiaire.get('ecole', '')],
+        ["Classe (si applicable)", beneficiaire.get('classe', '')],
+        ["Personne de référence (si applicable)", beneficiaire.get('personne_reference', '')]
     ]
     
-    story.append(Paragraph("INFORMATIONS PERSONNELLES", styles['Heading2']))
-    table2 = Table(user_info)
-    table2.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (0, -1), colors.lightgrey),
-        ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
-        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-        ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
-        ('FONTSIZE', (0, 0), (-1, -1), 10),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 12),
-        ('BACKGROUND', (1, 0), (1, -1), colors.beige),
-        ('GRID', (0, 0), (-1, -1), 1, colors.black)
+    profit_table = Table(profit_data, colWidths=[8*cm, 10*cm])
+    profit_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.lightgreen),
+        ('BACKGROUND', (0, 1), (0, -1), colors.lightgrey),
+        ('GRID', (0, 0), (-1, -1), 1, colors.black),
+        ('FONTSIZE', (0, 0), (-1, -1), 9),
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
     ]))
-    story.append(table2)
-    story.append(Spacer(1, 20))
+    story.append(profit_table)
+    story.append(Spacer(1, 5*mm))
     
-    # Devices requested
-    story.append(Paragraph("APPAREILS DEMANDÉS", styles['Heading2']))
-    devices_text = ", ".join([device.replace("_", " ").title() for device in request_data.get("devices", [])])
-    story.append(Paragraph(devices_text, styles['Normal']))
-    story.append(Spacer(1, 10))
+    # Section Matériel informatique souhaité
+    device_mapping = {
+        'ipad': 'iPad avec clavier ergonomique',
+        'macbook': 'MacBook',
+        'apple_pencil': 'Apple Pencil'
+    }
     
-    # Application requirements
-    story.append(Paragraph("EXIGENCES D'APPLICATION", styles['Heading2']))
-    story.append(Paragraph(request_data.get("application_requirements", "Aucune"), styles['Normal']))
+    devices_text = []
+    quantities = []
+    for device in request_data.get('devices', []):
+        devices_text.append(device_mapping.get(device, device))
+        quantities.append('1')
     
-    # Device details if available
-    if request_data.get("device_serial_numbers") or request_data.get("device_asset_tags"):
-        story.append(Spacer(1, 20))
-        story.append(Paragraph("DÉTAILS DES APPAREILS", styles['Heading2']))
-        
-        device_details = []
-        for device in request_data.get("devices", []):
-            serial = request_data.get("device_serial_numbers", {}).get(device, "N/A")
-            asset_tag = request_data.get("device_asset_tags", {}).get(device, "N/A")
-            device_details.append([device.replace("_", " ").title(), serial, asset_tag])
-        
-        if device_details:
-            device_table = Table([["Appareil", "Numéro de série", "Asset Tag"]] + device_details)
-            device_table.setStyle(TableStyle([
-                ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
-                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                ('FONTSIZE', (0, 0), (-1, 0), 12),
-                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-                ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
-                ('GRID', (0, 0), (-1, -1), 1, colors.black)
-            ]))
-            story.append(device_table)
+    materiel_data = [
+        ["Matériel informatique souhaité", ""],
+        ["Matériel (iPad, Laptop)", '\n'.join(devices_text)],
+        ["Quantité", '\n'.join(quantities)],
+        ["Lieu de réception du matériel", request_data.get('lieu_reception', 'Centre Technolink')],
+        ["Remarque éventuelle sur le lieu d'utilisation du matériel", "À l'école et à domicile"],
+        ["", ""],
+        ["Applications ou logiciels installés", request_data.get('application_requirements', '')]
+    ]
+    
+    materiel_table = Table(materiel_data, colWidths=[8*cm, 10*cm])
+    materiel_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.lightgreen),
+        ('BACKGROUND', (0, 1), (0, -1), colors.lightgrey),
+        ('GRID', (0, 0), (-1, -1), 1, colors.black),
+        ('FONTSIZE', (0, 0), (-1, -1), 9),
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+    ]))
+    story.append(materiel_table)
+    story.append(Spacer(1, 5*mm))
+    
+    # Section Durée
+    duree_data = [
+        ["Durée de fin de mise à disposition", ""],
+        ["", request_data.get('duree_fin_disposition', 'Fin d\'année scolaire')]
+    ]
+    
+    duree_table = Table(duree_data, colWidths=[8*cm, 10*cm])
+    duree_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.lightgreen),
+        ('BACKGROUND', (0, 1), (0, -1), colors.lightgrey),
+        ('GRID', (0, 0), (-1, -1), 1, colors.black),
+        ('FONTSIZE', (0, 0), (-1, -1), 9),
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+    ]))
+    story.append(duree_table)
+    story.append(Spacer(1, 5*mm))
+    
+    # Section Avis du Centre Technolink
+    avis_data = [
+        ["Avis du Centre Technolink", ""],
+        ["Nom et Prénom", ""],
+        ["Email ou Téléphone", ""],
+        ["Numéro de série matériel", ""],
+        ["Avis et date", ""],
+        ["", ""],
+        ["Signature du Responsable ou de son représentant", ""]
+    ]
+    
+    avis_table = Table(avis_data, colWidths=[8*cm, 10*cm])
+    avis_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.lightblue),
+        ('BACKGROUND', (0, 1), (0, -1), colors.lightgrey),
+        ('GRID', (0, 0), (-1, -1), 1, colors.black),
+        ('FONTSIZE', (0, 0), (-1, -1), 9),
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+    ]))
+    story.append(avis_table)
+    story.append(Spacer(1, 5*mm))
+    
+    # Section Accusé de réception
+    accuse_data = [
+        ["Accusé de réception du matériel", ""],
+        ["Nom et Prénom du parent ou représentant", f"{beneficiaire.get('prenom', '')} {beneficiaire.get('nom', '')} ou représentant"],
+        ["Email ou Téléphone", ""],
+        ["Remarques éventuelles sur le matériel", ""],
+        ["", ""],
+        ["Date de réception et signature", ""]
+    ]
+    
+    accuse_table = Table(accuse_data, colWidths=[8*cm, 10*cm])
+    accuse_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+        ('BACKGROUND', (0, 1), (0, -1), colors.lightgrey),
+        ('GRID', (0, 0), (-1, -1), 1, colors.black),
+        ('FONTSIZE', (0, 0), (-1, -1), 9),
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+    ]))
+    story.append(accuse_table)
+    story.append(Spacer(1, 10*mm))
+    
+    # Footer note
+    footer_note = Paragraph("Le preneur et le demandeur ont pris connaissance et accepté la notice d'information annexée à ce formulaire.", styles['Normal'])
+    story.append(footer_note)
+    story.append(Spacer(1, 10*mm))
+    
+    # Logo footer
+    footer_logo = Paragraph("🏛️<br/>VILLE DE<br/>LUXEMBOURG", header_style)
+    story.append(footer_logo)
+    
+    # Notice d'information (page 2)
+    story.append(Spacer(1, 20*mm))  # Page break
+    
+    notice_title = Paragraph("Notice d'information en relation avec la mise à disposition de matérielle informatique dans le cadre de l'inclusion des élèves à besoins spécifiques (EBS)", title_style)
+    story.append(notice_title)
+    story.append(Spacer(1, 10*mm))
+    
+    notice_text = """
+    Dans le cadre d'une collaboration avec le Ministère de l'Éducation nationale, de l'Enfance et de la Jeunesse (Direction régionale 01), la Ville équipe les écoles fondamentales de la Ville de Luxembourg avec du matériel et des équipements informatiques. Sur demande et en concertation avec la Direction régionale, la Direction régionale de la Ville met à disposition du matériel informatique pour ses élèves à besoins spécifiques à des fins pédagogiques. Dans le cadre de cette mise à disposition, la Ville reste propriétaire du matériel informatique qui sera restitué par le preneur par premiers soins de la Ville. Dans le cadre de cette mise à disposition, le matériel informatique sera restitué par le preneur lors de la rupture du lien de cause.
+    
+    Protection des données à caractère personnel
+    
+    Conformément à la législation en matière de protection des personnes physiques à l'égard du traitement de données à caractère personnel, la Ville de Luxembourg précise qu'elle collecte, traite et conserve les données à caractère personnel en vertu de l'autorisation de la présente mise à disposition sur le matériel informatique.
+    
+    Le traitement des données à caractère personnel sera effectué retenu par les agents du service Technolink de la Ville donc que par les différents services de l'administration communale de la Ville de Luxembourg qui interviendront dans l'exécution de la mise à disposition.
+    
+    La base juridique du traitement nécessaire à l'exécution des données à caractère personnel collectées l'exécution de la mise à disposition. Les données et informations collectées peuvent également servir à des fins statistiques ou archivistiques, dans un but d'intérêt public.
+    
+    Les données à caractère personnel, informations et documents sont conservés pour la durée nécessaire à la réalisation de ces finalités et ne font pas l'objet d'un quelconque transfert à des tierces personnes.
+    
+    Vous reconnaissez avoir été informé des différents droits contenus en vertu du Règlement Général sur la Protection des Données UE 2016/679 et notamment du droit d'accès, du droit de rectification ainsi que, le cas échéant, du droit d'opposition et de limitation du traitement de vos données à caractère personnel. L'administration communale de la Ville de Luxembourg ne met pas en œuvre de traitement automatisé de vos données à caractère personnel. 
+    
+    Pour de plus amples informations voir: www.vdl.lu/donnees-privees
+    
+    Vous disposez également du droit d'introduire une réclamation auprès de la Commission nationale pour la protection des données au Luxembourg (www.cnpd.lu).
+    """
+    
+    notice_paragraph = Paragraph(notice_text, styles['Normal'])
+    story.append(notice_paragraph)
     
     doc.build(story)
     buffer.seek(0)
@@ -257,6 +405,9 @@ async def register(user_data: UserCreate):
         "first_name": user_data.first_name,
         "last_name": user_data.last_name,
         "role": user_data.role,
+        "fonction": user_data.fonction,
+        "adresse_complete": user_data.adresse_complete,
+        "telephone": user_data.telephone,
         "created_at": datetime.utcnow().isoformat()
     }
     
@@ -326,6 +477,9 @@ async def create_request(request_data: DeviceRequest, token_data: dict = Depends
         "user_id": token_data["user_id"],
         "devices": request_data.devices,
         "application_requirements": request_data.application_requirements,
+        "beneficiaire": request_data.beneficiaire.dict(),
+        "lieu_reception": request_data.lieu_reception,
+        "duree_fin_disposition": request_data.duree_fin_disposition,
         "phone": request_data.phone,
         "address": request_data.address,
         "status": "en_attente",
@@ -427,7 +581,47 @@ async def update_request(request_id: str, update_data: RequestUpdate, token_data
         {"$set": update_fields}
     )
     
+    # Auto-generate PDF when status becomes "prepare"
+    if update_data.status == "prepare":
+        try:
+            user = users_collection.find_one({"_id": request["user_id"]})
+            if user:
+                updated_request = requests_collection.find_one({"_id": request_id})
+                pdf_content = generate_official_ebs_pdf(updated_request, user)
+                
+                # Save PDF to file system (you might want to save to cloud storage instead)
+                pdf_filename = f"EBS_demande_{request_id}_{datetime.now().strftime('%Y%m%d')}.pdf"
+                pdf_path = f"/tmp/{pdf_filename}"
+                
+                with open(pdf_path, 'wb') as f:
+                    f.write(pdf_content)
+                
+                # Store PDF path in request
+                requests_collection.update_one(
+                    {"_id": request_id},
+                    {"$set": {"official_pdf_path": pdf_path, "official_pdf_generated": True}}
+                )
+                
+                print(f"Official PDF generated for request {request_id}: {pdf_path}")
+        except Exception as e:
+            print(f"Error generating official PDF for request {request_id}: {e}")
+    
     return {"message": "Request updated successfully"}
+
+@app.delete("/api/requests/{request_id}")
+async def delete_request(request_id: str, token_data: dict = Depends(require_admin)):
+    """Delete a request - Admin only"""
+    request = requests_collection.find_one({"_id": request_id})
+    if not request:
+        raise HTTPException(status_code=404, detail="Request not found")
+    
+    # Delete the request
+    result = requests_collection.delete_one({"_id": request_id})
+    
+    if result.deleted_count == 1:
+        return {"message": "Request deleted successfully"}
+    else:
+        raise HTTPException(status_code=500, detail="Failed to delete request")
 
 @app.get("/api/requests/{request_id}/pdf")
 async def download_pdf(request_id: str, token_data: dict = Depends(verify_token)):
@@ -444,8 +638,8 @@ async def download_pdf(request_id: str, token_data: dict = Depends(verify_token)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     
-    # Generate PDF
-    pdf_content = generate_pdf_report(request, user)
+    # Generate official PDF
+    pdf_content = generate_official_ebs_pdf(request, user)
     
     # Save to temp file and return
     with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as tmp_file:
@@ -455,7 +649,7 @@ async def download_pdf(request_id: str, token_data: dict = Depends(verify_token)
         return FileResponse(
             tmp_file.name,
             media_type='application/pdf',
-            filename=f'demande_{request_id}.pdf'
+            filename=f'EBS_demande_{request_id}.pdf'
         )
 
 # Dashboard stats for admin
@@ -465,6 +659,7 @@ async def get_dashboard_stats(token_data: dict = Depends(require_admin)):
         "total_requests": requests_collection.count_documents({}),
         "pending_requests": requests_collection.count_documents({"status": "en_attente"}),
         "approved_requests": requests_collection.count_documents({"status": "approuve"}),
+        "prepared_requests": requests_collection.count_documents({"status": "prepare"}),
         "completed_requests": requests_collection.count_documents({"status": "termine"}),
         "status_breakdown": {}
     }
