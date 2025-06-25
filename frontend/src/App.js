@@ -548,13 +548,14 @@ const RequestForm = ({ currentUser, setCurrentView, setError }) => {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Date de naissance
+                  Matricule
                 </label>
                 <input
-                  type="date"
-                  value={formData.beneficiaire.date_naissance}
-                  onChange={(e) => handleBeneficiaireChange('date_naissance', e.target.value)}
+                  type="text"
+                  value={formData.beneficiaire.matricule}
+                  onChange={(e) => handleBeneficiaireChange('matricule', e.target.value)}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="ex: 20241234567"
                 />
               </div>
               <div>
