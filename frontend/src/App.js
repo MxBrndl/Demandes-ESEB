@@ -593,8 +593,8 @@ const RequestForm = ({ currentUser, setCurrentView, setError }) => {
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 >
                   <option value="EBS">EBS</option>
-                  <option value="ESS">ESS</option>
                   <option value="ESEB">ESEB</option>
+                  <option value="i-EBS">i-EBS</option>
                 </select>
               </div>
               <div className="md:col-span-2">
