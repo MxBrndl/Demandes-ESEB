@@ -469,98 +469,157 @@ def main():
     base_url = "https://cf5f5943-8307-4683-a019-f955a960375d.preview.emergentagent.com"
     tester = ESEBAPITester(base_url)
     
-    print("\n===== TESTING AUTHENTICATION WITH PROVIDED ACCOUNTS =====")
+    print("\n===== TESTING AUTOMATIC PDF GENERATION WORKFLOW =====")
     
-    # Use the provided test accounts
+    # Use the provided test accounts from the test scenario
     admin_email = "admin@eseb.com"
-    user_email = "utilisateur@eseb.com"
     admin_password = "admin123"
-    user_password = "user123"
     
-    # Login with provided accounts
+    # Login with admin account
     admin_login = tester.test_login(admin_email, admin_password, "admin")
-    user_login = tester.test_login(user_email, user_password, "user")
     
-    # If login fails with provided accounts, try to register them with extended fields
     if not admin_login:
-        print("⚠️ Admin login failed, trying to register admin account with extended fields")
-        tester.test_register_user(
-            admin_email, 
-            admin_password, 
-            "Admin", 
-            "ESEB", 
-            "admin",
-            fonction="Gestionnaire administratif",
-            adresse_complete="5, rue Thomas Edison - L-1445 Strassen",
-            telephone="(+352) 247-65868"
-        )
-    if not user_login:
-        print("⚠️ User login failed, trying to register user account with extended fields")
-        tester.test_register_user(
-            user_email, 
-            user_password, 
-            "Utilisateur", 
-            "ESEB", 
-            "user",
-            fonction="Enseignant",
-            adresse_complete="10, rue de l'École - L-1234 Luxembourg",
-            telephone="(+352) 247-12345"
-        )
+        print("❌ Admin login failed, cannot proceed with PDF generation test")
+        return 1
     
-    # Test getting current user
-    if tester.admin_token:
-        tester.test_get_current_user(tester.admin_token, "admin")
-    if tester.user_token:
-        tester.test_get_current_user(tester.user_token, "user")
+    print("\n===== CREATING NEW EBS REQUEST WITH COMPLETE DATA =====")
     
-    print("\n===== TESTING DEVICE REQUESTS WITH BENEFICIARY INFO =====")
+    # Create a new request with the specific test data
+    data = {
+        "devices": ["ipad", "macbook", "apple_pencil"],
+        "application_requirements": "Applications éducatives pour besoins spécifiques",
+        "phone": "+352123456789",
+        "address": "123 Rue de Luxembourg",
+        "lieu_reception": "Centre Technolink",
+        "duree_fin_disposition": "Fin d'année scolaire",
+        "beneficiaire": {
+            "nom": "Dupont",
+            "prenom": "Jean",
+            "date_naissance": "2010-05-15",
+            "ecole": "École Test Luxembourg",
+            "classe": "6e année",
+            "qualite_ebs": "EBS",
+            "personne_reference": "Marie Dupont"
+        }
+    }
     
-    # Create requests with beneficiary information
-    admin_request_id = tester.test_create_request(tester.admin_token, tester.admin_id, "admin")
-    user_request_id = tester.test_create_request(tester.user_token, tester.user_id, "user")
+    url = f"{base_url}/api/requests"
+    headers = {
+        'Content-Type': 'application/json',
+        'Authorization': f'Bearer {tester.admin_token}'
+    }
     
-    # Get requests
-    if tester.admin_token:
-        tester.test_get_requests(tester.admin_token, "admin")
-    if tester.user_token:
-        tester.test_get_requests(tester.user_token, "user")
+    print("🔍 Creating new EBS request with complete data...")
+    try:
+        response = requests.post(url, json=data, headers=headers)
+        if response.status_code == 200:
+            request_id = response.json()['request_id']
+            print(f"✅ Request created successfully with ID: {request_id}")
+        else:
+            print(f"❌ Failed to create request - Status: {response.status_code}")
+            try:
+                print(f"Response: {response.json()}")
+            except:
+                print(f"Response: {response.text}")
+            return 1
+    except Exception as e:
+        print(f"❌ Error creating request: {str(e)}")
+        return 1
     
-    print("\n===== TESTING ASSET TAG VALIDATION =====")
+    print("\n===== UPDATING REQUEST TO 'PREPARE' STATUS TO TRIGGER PDF GENERATION =====")
     
-    # Test asset tag validation
-    if admin_request_id:
-        tester.test_update_request_with_invalid_asset_tag(admin_request_id)
-        tester.test_update_request_without_serial_for_required_devices(admin_request_id)
-        tester.test_update_request_with_valid_asset_tag(admin_request_id)
+    # Update the request to "prepare" status with required device info
+    update_data = {
+        "status": "prepare",
+        "device_serial_numbers": {
+            "ipad": "IPAD123456789",
+            "macbook": "MACBOOK987654321",
+            "apple_pencil": ""
+        },
+        "device_asset_tags": {
+            "ipad": "H12345",
+            "macbook": "H67890",
+            "apple_pencil": ""
+        },
+        "admin_notes": "Demande préparée, PDF officiel généré automatiquement."
+    }
     
-    print("\n===== TESTING PDF GENERATION =====")
+    update_url = f"{base_url}/api/requests/{request_id}"
     
-    # Test PDF generation when status is set to "prepare"
-    if user_request_id:
-        tester.test_update_request_to_prepared_and_check_pdf(user_request_id)
+    print("🔍 Updating request to 'prepare' status to trigger PDF generation...")
+    try:
+        update_response = requests.put(update_url, json=update_data, headers=headers)
+        if update_response.status_code == 200:
+            print(f"✅ Request updated to 'prepare' status successfully")
+        else:
+            print(f"❌ Failed to update request - Status: {update_response.status_code}")
+            try:
+                print(f"Response: {update_response.json()}")
+            except:
+                print(f"Response: {update_response.text}")
+            return 1
+    except Exception as e:
+        print(f"❌ Error updating request: {str(e)}")
+        return 1
     
-    print("\n===== TESTING REQUEST DELETION =====")
+    print("\n===== VERIFYING PDF GENERATION =====")
     
-    # Test request deletion (user should fail, admin should succeed)
-    if user_request_id:
-        tester.test_delete_request_as_user(user_request_id)
-        tester.test_delete_request(user_request_id)
+    # Get the request details to check if PDF was generated
+    get_url = f"{base_url}/api/requests/{request_id}"
     
-    # Get dashboard stats
-    if tester.admin_token:
-        tester.test_get_dashboard_stats()
+    print("🔍 Checking if PDF was generated...")
+    try:
+        get_response = requests.get(get_url, headers=headers)
+        if get_response.status_code == 200:
+            request_data = get_response.json()
+            if request_data.get('official_pdf_generated', False):
+                print(f"✅ PDF was successfully generated automatically")
+                pdf_generated = True
+            else:
+                print(f"❌ PDF was not generated automatically")
+                pdf_generated = False
+        else:
+            print(f"❌ Failed to get request details - Status: {get_response.status_code}")
+            try:
+                print(f"Response: {get_response.json()}")
+            except:
+                print(f"Response: {get_response.text}")
+            return 1
+    except Exception as e:
+        print(f"❌ Error getting request details: {str(e)}")
+        return 1
     
-    # Print results
-    print(f"\n📊 Tests passed: {tester.tests_passed}/{tester.tests_run}")
+    print("\n===== TESTING PDF DOWNLOAD =====")
     
-    # Print summary of new features tested
-    print("\n===== NEW FEATURES TEST SUMMARY =====")
-    print(f"✅ Extended registration form: Tested")
-    print(f"✅ Extended request form with beneficiary info: Tested")
-    print(f"✅ PDF generation on 'prepare' status: {'Successful' if tester.pdf_generated else 'Failed'}")
-    print(f"✅ Admin-only request deletion: Tested")
+    # Try to download the PDF
+    pdf_url = f"{base_url}/api/requests/{request_id}/pdf"
     
-    return 0 if tester.tests_passed == tester.tests_run else 1
+    print("🔍 Attempting to download the PDF...")
+    try:
+        pdf_response = requests.get(pdf_url, headers=headers)
+        if pdf_response.status_code == 200 and pdf_response.headers.get('Content-Type') == 'application/pdf':
+            print(f"✅ PDF downloaded successfully")
+            pdf_download_success = True
+        else:
+            print(f"❌ Failed to download PDF - Status: {pdf_response.status_code}")
+            pdf_download_success = False
+    except Exception as e:
+        print(f"❌ Error downloading PDF: {str(e)}")
+        pdf_download_success = False
+    
+    # Print summary
+    print("\n===== AUTOMATIC PDF GENERATION TEST SUMMARY =====")
+    print(f"✅ Admin login: {'Successful' if admin_login else 'Failed'}")
+    print(f"✅ Create EBS request: {'Successful' if request_id else 'Failed'}")
+    print(f"✅ Update to 'prepare' status: {'Successful' if update_response.status_code == 200 else 'Failed'}")
+    print(f"✅ Automatic PDF generation: {'Successful' if pdf_generated else 'Failed'}")
+    print(f"✅ PDF download: {'Successful' if pdf_download_success else 'Failed'}")
+    
+    overall_success = admin_login and request_id and update_response.status_code == 200 and pdf_generated and pdf_download_success
+    
+    print(f"\n{'✅ ALL TESTS PASSED' if overall_success else '❌ SOME TESTS FAILED'}")
+    
+    return 0 if overall_success else 1
 
 if __name__ == "__main__":
     main()
