@@ -329,22 +329,92 @@ class ESEBAPITester:
         
         return ipad_test_passed and macbook_test_passed
 
-    def test_get_dashboard_stats(self):
-        """Test getting dashboard stats as admin"""
-        if not self.admin_token:
-            print("❌ No admin token available")
+    def test_update_request_to_prepared_and_check_pdf(self, request_id):
+        """Test updating a request to 'prepare' status and check PDF generation"""
+        if not self.admin_token or not request_id:
+            print("❌ No admin token or request ID available")
+            return False
+        
+        data = {
+            "status": "prepare",
+            "device_serial_numbers": {
+                "ipad": "IPAD123456789",
+                "macbook": "MACBOOK987654321",
+                "apple_pencil": ""
+            },
+            "device_asset_tags": {
+                "ipad": "H12345",
+                "macbook": "H67890",
+                "apple_pencil": "H11111"
+            },
+            "admin_notes": "Demande préparée, PDF officiel généré automatiquement."
+        }
+        
+        success, response = self.run_test(
+            "Update request to 'prepare' status",
+            "PUT",
+            f"requests/{request_id}",
+            200,
+            data=data,
+            token=self.admin_token
+        )
+        
+        if success:
+            print(f"✅ Request {request_id} updated to 'prepare' status")
+            
+            # Now try to download the PDF
+            pdf_success, pdf_response = self.run_test(
+                "Download PDF for prepared request",
+                "GET",
+                f"requests/{request_id}/pdf",
+                200,
+                token=self.admin_token
+            )
+            
+            if pdf_success:
+                self.pdf_generated = True
+                print(f"✅ PDF successfully generated for request {request_id}")
+                return True
+        
+        return False
+        
+    def test_delete_request(self, request_id):
+        """Test deleting a request as admin"""
+        if not self.admin_token or not request_id:
+            print("❌ No admin token or request ID available")
             return False
         
         success, response = self.run_test(
-            "Get dashboard stats",
-            "GET",
-            "dashboard/stats",
+            "Delete request as admin",
+            "DELETE",
+            f"requests/{request_id}",
             200,
             token=self.admin_token
         )
         
-        if success and 'total_requests' in response:
-            print(f"✅ Got dashboard stats: {response['total_requests']} total requests")
+        if success:
+            print(f"✅ Request {request_id} deleted successfully")
+            return True
+        
+        return False
+        
+    def test_delete_request_as_user(self, request_id):
+        """Test attempting to delete a request as regular user (should fail)"""
+        if not self.user_token or not request_id:
+            print("❌ No user token or request ID available")
+            return False
+        
+        success, response = self.run_test(
+            "Attempt to delete request as user (should fail)",
+            "DELETE",
+            f"requests/{request_id}",
+            403,  # Expecting Forbidden
+            token=self.user_token
+        )
+        
+        # This test passes if it fails with 403 Forbidden
+        if success:
+            print(f"✅ Correctly prevented user from deleting request {request_id}")
             return True
         
         return False
