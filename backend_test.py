@@ -384,19 +384,32 @@ class ESEBAPITester:
             print("❌ No admin token or request ID available")
             return False
         
-        success, response = self.run_test(
-            "Delete request as admin",
-            "DELETE",
-            f"requests/{request_id}",
-            200,
-            token=self.admin_token
-        )
+        url = f"{self.base_url}/api/requests/{request_id}"
+        headers = {'Authorization': f'Bearer {self.admin_token}'}
         
-        if success:
-            print(f"✅ Request {request_id} deleted successfully")
-            return True
+        self.tests_run += 1
+        print(f"\n🔍 Testing Delete request as admin...")
         
-        return False
+        try:
+            response = requests.delete(url, headers=headers)
+            success = response.status_code == 200
+            
+            if success:
+                self.tests_passed += 1
+                print(f"✅ Passed - Status: {response.status_code}")
+                print(f"✅ Request {request_id} deleted successfully")
+                return True
+            else:
+                print(f"❌ Failed - Expected 200, got {response.status_code}")
+                try:
+                    print(f"Response: {response.json()}")
+                except:
+                    print(f"Response: {response.text}")
+                return False
+                
+        except Exception as e:
+            print(f"❌ Failed - Error: {str(e)}")
+            return False
         
     def test_delete_request_as_user(self, request_id):
         """Test attempting to delete a request as regular user (should fail)"""
@@ -404,20 +417,32 @@ class ESEBAPITester:
             print("❌ No user token or request ID available")
             return False
         
-        success, response = self.run_test(
-            "Attempt to delete request as user (should fail)",
-            "DELETE",
-            f"requests/{request_id}",
-            403,  # Expecting Forbidden
-            token=self.user_token
-        )
+        url = f"{self.base_url}/api/requests/{request_id}"
+        headers = {'Authorization': f'Bearer {self.user_token}'}
         
-        # This test passes if it fails with 403 Forbidden
-        if success:
-            print(f"✅ Correctly prevented user from deleting request {request_id}")
-            return True
+        self.tests_run += 1
+        print(f"\n🔍 Testing Attempt to delete request as user (should fail)...")
         
-        return False
+        try:
+            response = requests.delete(url, headers=headers)
+            success = response.status_code == 403  # Expecting Forbidden
+            
+            if success:
+                self.tests_passed += 1
+                print(f"✅ Passed - Status: {response.status_code}")
+                print(f"✅ Correctly prevented user from deleting request {request_id}")
+                return True
+            else:
+                print(f"❌ Failed - Expected 403, got {response.status_code}")
+                try:
+                    print(f"Response: {response.json()}")
+                except:
+                    print(f"Response: {response.text}")
+                return False
+                
+        except Exception as e:
+            print(f"❌ Failed - Error: {str(e)}")
+            return False
 
     def test_get_dashboard_stats(self):
         """Test getting dashboard stats as admin"""
