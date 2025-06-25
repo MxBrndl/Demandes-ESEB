@@ -296,23 +296,25 @@ def main():
     base_url = "https://cf5f5943-8307-4683-a019-f955a960375d.preview.emergentagent.com"
     tester = ESEBAPITester(base_url)
     
-    # Test data
-    timestamp = datetime.now().strftime('%H%M%S')
-    admin_email = f"admin{timestamp}@test.com"
-    user_email = f"user{timestamp}@test.com"
-    password = "password123"
+    print("\n===== TESTING AUTHENTICATION WITH PROVIDED ACCOUNTS =====")
     
-    print("\n===== TESTING AUTHENTICATION WITH NEW ROLES =====")
+    # Use the provided test accounts
+    admin_email = "admin@eseb.com"
+    user_email = "utilisateur@eseb.com"
+    admin_password = "admin123"
+    user_password = "user123"
     
-    # Try to login with predefined users first
-    admin_login = tester.test_login("admin@test.com", password, "admin")
-    user_login = tester.test_login("user@test.com", password, "user")
+    # Login with provided accounts
+    admin_login = tester.test_login(admin_email, admin_password, "admin")
+    user_login = tester.test_login(user_email, user_password, "user")
     
-    # If login fails, register new users
+    # If login fails with provided accounts, try to register them
     if not admin_login:
-        tester.test_register_user(admin_email, password, "Admin", "User", "admin")
+        print("⚠️ Admin login failed, trying to register admin account")
+        tester.test_register_user(admin_email, admin_password, "Admin", "ESEB", "admin")
     if not user_login:
-        tester.test_register_user(user_email, password, "Regular", "User", "user")
+        print("⚠️ User login failed, trying to register user account")
+        tester.test_register_user(user_email, user_password, "Utilisateur", "ESEB", "user")
     
     # Test getting current user
     if tester.admin_token:
