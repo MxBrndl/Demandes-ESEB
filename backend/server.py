@@ -60,7 +60,6 @@ class UserLogin(BaseModel):
     password: str
 
 class DeviceRequest(BaseModel):
-    user_id: str
     devices: List[str]  # ["ipad", "macbook", "apple_pencil"]
     application_requirements: str
     
