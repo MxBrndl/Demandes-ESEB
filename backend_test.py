@@ -15,6 +15,7 @@ class ESEBAPITester:
         self.admin_id = None
         self.user_id = None
         self.request_id = None
+        self.pdf_generated = False
 
     def run_test(self, name, method, endpoint, expected_status, data=None, token=None):
         """Run a single API test"""
