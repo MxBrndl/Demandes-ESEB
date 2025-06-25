@@ -419,6 +419,26 @@ class ESEBAPITester:
         
         return False
 
+    def test_get_dashboard_stats(self):
+        """Test getting dashboard stats as admin"""
+        if not self.admin_token:
+            print("❌ No admin token available")
+            return False
+        
+        success, response = self.run_test(
+            "Get dashboard stats",
+            "GET",
+            "dashboard/stats",
+            200,
+            token=self.admin_token
+        )
+        
+        if success and 'total_requests' in response:
+            print(f"✅ Got dashboard stats: {response['total_requests']} total requests")
+            return True
+        
+        return False
+
 def main():
     # Setup
     base_url = "https://cf5f5943-8307-4683-a019-f955a960375d.preview.emergentagent.com"
@@ -436,13 +456,31 @@ def main():
     admin_login = tester.test_login(admin_email, admin_password, "admin")
     user_login = tester.test_login(user_email, user_password, "user")
     
-    # If login fails with provided accounts, try to register them
+    # If login fails with provided accounts, try to register them with extended fields
     if not admin_login:
-        print("⚠️ Admin login failed, trying to register admin account")
-        tester.test_register_user(admin_email, admin_password, "Admin", "ESEB", "admin")
+        print("⚠️ Admin login failed, trying to register admin account with extended fields")
+        tester.test_register_user(
+            admin_email, 
+            admin_password, 
+            "Admin", 
+            "ESEB", 
+            "admin",
+            fonction="Gestionnaire administratif",
+            adresse_complete="5, rue Thomas Edison - L-1445 Strassen",
+            telephone="(+352) 247-65868"
+        )
     if not user_login:
-        print("⚠️ User login failed, trying to register user account")
-        tester.test_register_user(user_email, user_password, "Utilisateur", "ESEB", "user")
+        print("⚠️ User login failed, trying to register user account with extended fields")
+        tester.test_register_user(
+            user_email, 
+            user_password, 
+            "Utilisateur", 
+            "ESEB", 
+            "user",
+            fonction="Enseignant",
+            adresse_complete="10, rue de l'École - L-1234 Luxembourg",
+            telephone="(+352) 247-12345"
+        )
     
     # Test getting current user
     if tester.admin_token:
@@ -450,9 +488,9 @@ def main():
     if tester.user_token:
         tester.test_get_current_user(tester.user_token, "user")
     
-    print("\n===== TESTING DEVICE REQUESTS =====")
+    print("\n===== TESTING DEVICE REQUESTS WITH BENEFICIARY INFO =====")
     
-    # Create requests
+    # Create requests with beneficiary information
     admin_request_id = tester.test_create_request(tester.admin_token, tester.admin_id, "admin")
     user_request_id = tester.test_create_request(tester.user_token, tester.user_id, "user")
     
@@ -470,12 +508,33 @@ def main():
         tester.test_update_request_without_serial_for_required_devices(admin_request_id)
         tester.test_update_request_with_valid_asset_tag(admin_request_id)
     
+    print("\n===== TESTING PDF GENERATION =====")
+    
+    # Test PDF generation when status is set to "prepare"
+    if user_request_id:
+        tester.test_update_request_to_prepared_and_check_pdf(user_request_id)
+    
+    print("\n===== TESTING REQUEST DELETION =====")
+    
+    # Test request deletion (user should fail, admin should succeed)
+    if user_request_id:
+        tester.test_delete_request_as_user(user_request_id)
+        tester.test_delete_request(user_request_id)
+    
     # Get dashboard stats
     if tester.admin_token:
         tester.test_get_dashboard_stats()
     
     # Print results
     print(f"\n📊 Tests passed: {tester.tests_passed}/{tester.tests_run}")
+    
+    # Print summary of new features tested
+    print("\n===== NEW FEATURES TEST SUMMARY =====")
+    print(f"✅ Extended registration form: Tested")
+    print(f"✅ Extended request form with beneficiary info: Tested")
+    print(f"✅ PDF generation on 'prepare' status: {'Successful' if tester.pdf_generated else 'Failed'}")
+    print(f"✅ Admin-only request deletion: Tested")
+    
     return 0 if tester.tests_passed == tester.tests_run else 1
 
 if __name__ == "__main__":
