@@ -130,10 +130,10 @@ class ESEBAPITester:
         
         data = {
             "user_id": user_id,
-            "devices": ["ipad", "apple_pencil"],
-            "application_requirements": "Besoin d'applications pour prendre des notes et dessiner",
+            "devices": ["ipad", "macbook", "apple_pencil"],
+            "application_requirements": "Besoin d'applications pour prendre des notes et dessiner. Logiciels de programmation pour le MacBook.",
             "phone": "+33987654321",
-            "address": "123 Rue de l'École, Paris"
+            "address": "123 Rue de l'École, Luxembourg"
         }
         
         success, response = self.run_test(
