@@ -1402,8 +1402,12 @@ const RequestManagementModal = ({ request, onClose, onUpdate }) => {
                           value={deviceInfo.serialNumbers[device] || ''}
                           onChange={(e) => handleDeviceInfoChange(device, 'serialNumbers', e.target.value)}
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                          placeholder="Entrez le numéro de série"
+                          placeholder={device === 'apple_pencil' ? 'Non requis pour Apple Pencil' : 'Entrez le numéro de série'}
+                          disabled={device === 'apple_pencil'}
                         />
+                        {device === 'apple_pencil' && (
+                          <p className="text-gray-500 text-xs mt-1">Apple Pencil ne nécessite pas de numéro de série</p>
+                        )}
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
