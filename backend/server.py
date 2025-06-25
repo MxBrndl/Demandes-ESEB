@@ -69,10 +69,10 @@ class UserLogin(BaseModel):
 class BeneficiaireInfo(BaseModel):
     nom: str
     prenom: str
-    date_naissance: str
+    matricule: str
     ecole: str
     classe: str
-    qualite_ebs: str  # Type de handicap/besoin spécifique
+    qualite_ebs: str  # EBS, ESEB, i-EBS
     personne_reference: Optional[str] = None
 
 class DeviceRequest(BaseModel):
