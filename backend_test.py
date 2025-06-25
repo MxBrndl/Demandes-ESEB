@@ -536,12 +536,10 @@ def main():
         "status": "prepare",
         "device_serial_numbers": {
             "ipad": "IPAD123456789",
-            "macbook": "MACBOOK987654321",
-            "apple_pencil": ""
+            # No serial number for Apple Pencil - should be accepted
         },
         "device_asset_tags": {
             "ipad": "H12345",
-            "macbook": "H67890",
             "apple_pencil": ""
         },
         "admin_notes": "Demande préparée, PDF officiel généré automatiquement."
