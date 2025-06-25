@@ -421,7 +421,7 @@ const RequestForm = ({ currentUser, setCurrentView, setError }) => {
 
     try {
       const token = localStorage.getItem('token');
-      await axios.post(`${API_BASE_URL}/api/requests`, formData, {
+      const response = await axios.post(`${API_BASE_URL}/api/requests`, formData, {
         headers: { Authorization: `Bearer ${token}` }
       });
       
