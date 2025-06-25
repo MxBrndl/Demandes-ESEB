@@ -377,7 +377,7 @@ def main():
     # Test asset tag validation
     if admin_request_id:
         tester.test_update_request_with_invalid_asset_tag(admin_request_id)
-        tester.test_update_request_without_serial_for_ipad(admin_request_id)
+        tester.test_update_request_without_serial_for_required_devices(admin_request_id)
         tester.test_update_request_with_valid_asset_tag(admin_request_id)
     
     # Get dashboard stats
