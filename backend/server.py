@@ -599,7 +599,7 @@ async def update_request(request_id: str, update_data: RequestUpdate, token_data
                 # Store PDF path in request
                 requests_collection.update_one(
                     {"_id": request_id},
-                    {"$set": {"official_pdf_path": pdf_path, "official_pdf_generated": True}}
+                    {"$set": {"official_pdf_path": pdf_path, "official_pdf_generated": True, "pdf_generated_at": datetime.utcnow().isoformat()}}
                 )
                 
                 print(f"Official PDF generated for request {request_id}: {pdf_path}")
