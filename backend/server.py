@@ -17,7 +17,7 @@ from reportlab.lib.pagesizes import letter, A4
 from reportlab.lib import colors
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib.units import inch, mm
+from reportlab.lib.units import inch, mm, cm
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 import io
