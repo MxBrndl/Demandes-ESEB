@@ -1,6 +1,7 @@
 import requests
 import json
 import time
+import re
 from datetime import datetime
 
 class ESEBAPITester:
@@ -10,11 +11,9 @@ class ESEBAPITester:
         self.tests_run = 0
         self.tests_passed = 0
         self.admin_token = None
-        self.student_token = None
-        self.teacher_token = None
+        self.user_token = None
         self.admin_id = None
-        self.student_id = None
-        self.teacher_id = None
+        self.user_id = None
         self.request_id = None
 
     def run_test(self, name, method, endpoint, expected_status, data=None, token=None):
@@ -75,12 +74,9 @@ class ESEBAPITester:
             if role == 'admin':
                 self.admin_token = response['token']
                 self.admin_id = response['user']['id']
-            elif role == 'student':
-                self.student_token = response['token']
-                self.student_id = response['user']['id']
-            elif role == 'teacher':
-                self.teacher_token = response['token']
-                self.teacher_id = response['user']['id']
+            elif role == 'user':
+                self.user_token = response['token']
+                self.user_id = response['user']['id']
             
             print(f"✅ {role.capitalize()} registered successfully with ID: {response['user']['id']}")
             return True
@@ -101,12 +97,9 @@ class ESEBAPITester:
             if role == 'admin':
                 self.admin_token = response['token']
                 self.admin_id = response['user']['id']
-            elif role == 'student':
-                self.student_token = response['token']
-                self.student_id = response['user']['id']
-            elif role == 'teacher':
-                self.teacher_token = response['token']
-                self.teacher_id = response['user']['id']
+            elif role == 'user':
+                self.user_token = response['token']
+                self.user_id = response['user']['id']
             
             print(f"✅ {role.capitalize()} logged in successfully")
             return True
@@ -129,70 +122,36 @@ class ESEBAPITester:
         
         return False
 
-    def test_create_student_request(self):
-        """Test creating a student request"""
-        if not self.student_token:
-            print("❌ No student token available")
+    def test_create_request(self, token, user_id, role):
+        """Test creating a device request"""
+        if not token:
+            print(f"❌ No {role} token available")
             return False
         
         data = {
-            "user_id": self.student_id,
-            "request_type": "student",
+            "user_id": user_id,
             "devices": ["ipad", "apple_pencil"],
             "application_requirements": "Besoin d'applications pour prendre des notes et dessiner",
-            "parent_first_name": "Jean",
-            "parent_last_name": "Dupont",
-            "parent_phone": "+33123456789",
-            "parent_email": "parent@test.com",
             "phone": "+33987654321",
             "address": "123 Rue de l'École, Paris"
         }
         
         success, response = self.run_test(
-            "Create student request",
+            f"Create request as {role}",
             "POST",
             "requests",
             200,
             data=data,
-            token=self.student_token
+            token=token
         )
         
         if success and 'request_id' in response:
-            self.request_id = response['request_id']
-            print(f"✅ Student request created with ID: {self.request_id}")
-            return True
+            if role == 'user':
+                self.request_id = response['request_id']
+            print(f"✅ Request created with ID: {response['request_id']}")
+            return response['request_id']
         
-        return False
-
-    def test_create_teacher_request(self):
-        """Test creating a teacher request"""
-        if not self.teacher_token:
-            print("❌ No teacher token available")
-            return False
-        
-        data = {
-            "user_id": self.teacher_id,
-            "request_type": "teacher",
-            "devices": ["macbook", "ipad"],
-            "application_requirements": "Besoin d'applications pour préparer des cours et faire des présentations",
-            "phone": "+33123456789",
-            "address": "456 Avenue des Professeurs, Lyon"
-        }
-        
-        success, response = self.run_test(
-            "Create teacher request",
-            "POST",
-            "requests",
-            200,
-            data=data,
-            token=self.teacher_token
-        )
-        
-        if success and 'request_id' in response:
-            print(f"✅ Teacher request created with ID: {response['request_id']}")
-            return True
-        
-        return False
+        return None
 
     def test_get_requests(self, token, role):
         """Test getting requests"""
@@ -210,28 +169,104 @@ class ESEBAPITester:
         
         return False
 
-    def test_update_request(self):
-        """Test updating a request as admin"""
-        if not self.admin_token or not self.request_id:
+    def test_update_request_with_valid_asset_tag(self, request_id):
+        """Test updating a request with valid asset tag"""
+        if not self.admin_token or not request_id:
             print("❌ No admin token or request ID available")
             return False
         
         data = {
             "status": "approuve",
-            "admin_notes": "Demande approuvée. Les appareils seront disponibles la semaine prochaine."
+            "device_asset_tags": {
+                "ipad": "H12345",
+                "apple_pencil": "H67890"
+            },
+            "device_serial_numbers": {
+                "ipad": "IPAD123456789",
+                "apple_pencil": ""
+            },
+            "admin_notes": "Demande approuvée avec asset tags valides."
         }
         
         success, response = self.run_test(
-            "Update request as admin",
+            "Update request with valid asset tags",
             "PUT",
-            f"requests/{self.request_id}",
+            f"requests/{request_id}",
             200,
             data=data,
             token=self.admin_token
         )
         
         if success:
-            print(f"✅ Request {self.request_id} updated successfully")
+            print(f"✅ Request {request_id} updated successfully with valid asset tags")
+            return True
+        
+        return False
+
+    def test_update_request_with_invalid_asset_tag(self, request_id):
+        """Test updating a request with invalid asset tag"""
+        if not self.admin_token or not request_id:
+            print("❌ No admin token or request ID available")
+            return False
+        
+        data = {
+            "status": "approuve",
+            "device_asset_tags": {
+                "ipad": "ABC123",  # Invalid format
+                "apple_pencil": "H67890"
+            },
+            "admin_notes": "Tentative avec asset tag invalide."
+        }
+        
+        success, response = self.run_test(
+            "Update request with invalid asset tag",
+            "PUT",
+            f"requests/{request_id}",
+            400,  # Expecting error
+            data=data,
+            token=self.admin_token
+        )
+        
+        # This test passes if it fails with status 400
+        if not success and response.get('detail', '').find('Asset tag') >= 0:
+            self.tests_passed += 1
+            print(f"✅ Correctly rejected invalid asset tag format")
+            return True
+        
+        return False
+
+    def test_update_request_without_serial_for_ipad(self, request_id):
+        """Test updating a request without serial number for iPad"""
+        if not self.admin_token or not request_id:
+            print("❌ No admin token or request ID available")
+            return False
+        
+        data = {
+            "status": "approuve",
+            "device_asset_tags": {
+                "ipad": "H12345",
+                "apple_pencil": "H67890"
+            },
+            "device_serial_numbers": {
+                "ipad": "",  # Empty serial for iPad
+                "apple_pencil": ""
+            },
+            "admin_notes": "Tentative sans numéro de série pour iPad."
+        }
+        
+        success, response = self.run_test(
+            "Update request without iPad serial number",
+            "PUT",
+            f"requests/{request_id}",
+            400,  # Expecting error
+            data=data,
+            token=self.admin_token
+        )
+        
+        # This test passes if it fails with status 400
+        if not success and response.get('detail', '').find('Numéro de série obligatoire') >= 0:
+            self.tests_passed += 1
+            print(f"✅ Correctly rejected missing serial number for iPad")
             return True
         
         return False
@@ -264,51 +299,46 @@ def main():
     # Test data
     timestamp = datetime.now().strftime('%H%M%S')
     admin_email = f"admin{timestamp}@test.com"
-    student_email = f"etudiant{timestamp}@test.com"
-    teacher_email = f"enseignant{timestamp}@test.com"
+    user_email = f"user{timestamp}@test.com"
     password = "password123"
     
-    # Run tests
-    print("\n===== TESTING AUTHENTICATION =====")
+    print("\n===== TESTING AUTHENTICATION WITH NEW ROLES =====")
     
     # Try to login with predefined users first
     admin_login = tester.test_login("admin@test.com", password, "admin")
-    student_login = tester.test_login("etudiant@test.com", password, "student")
-    teacher_login = tester.test_login("enseignant@test.com", password, "teacher")
+    user_login = tester.test_login("user@test.com", password, "user")
     
     # If login fails, register new users
     if not admin_login:
         tester.test_register_user(admin_email, password, "Admin", "User", "admin")
-    if not student_login:
-        tester.test_register_user(student_email, password, "Étudiant", "Test", "student")
-    if not teacher_login:
-        tester.test_register_user(teacher_email, password, "Enseignant", "Test", "teacher")
+    if not user_login:
+        tester.test_register_user(user_email, password, "Regular", "User", "user")
     
     # Test getting current user
     if tester.admin_token:
         tester.test_get_current_user(tester.admin_token, "admin")
-    if tester.student_token:
-        tester.test_get_current_user(tester.student_token, "student")
-    if tester.teacher_token:
-        tester.test_get_current_user(tester.teacher_token, "teacher")
+    if tester.user_token:
+        tester.test_get_current_user(tester.user_token, "user")
     
-    print("\n===== TESTING REQUESTS =====")
+    print("\n===== TESTING DEVICE REQUESTS =====")
     
     # Create requests
-    tester.test_create_student_request()
-    tester.test_create_teacher_request()
+    admin_request_id = tester.test_create_request(tester.admin_token, tester.admin_id, "admin")
+    user_request_id = tester.test_create_request(tester.user_token, tester.user_id, "user")
     
     # Get requests
     if tester.admin_token:
         tester.test_get_requests(tester.admin_token, "admin")
-    if tester.student_token:
-        tester.test_get_requests(tester.student_token, "student")
-    if tester.teacher_token:
-        tester.test_get_requests(tester.teacher_token, "teacher")
+    if tester.user_token:
+        tester.test_get_requests(tester.user_token, "user")
     
-    # Update request
-    if tester.request_id:
-        tester.test_update_request()
+    print("\n===== TESTING ASSET TAG VALIDATION =====")
+    
+    # Test asset tag validation
+    if admin_request_id:
+        tester.test_update_request_with_invalid_asset_tag(admin_request_id)
+        tester.test_update_request_without_serial_for_ipad(admin_request_id)
+        tester.test_update_request_with_valid_asset_tag(admin_request_id)
     
     # Get dashboard stats
     if tester.admin_token:
