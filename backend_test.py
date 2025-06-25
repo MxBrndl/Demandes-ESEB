@@ -469,7 +469,7 @@ def main():
     base_url = "https://cf5f5943-8307-4683-a019-f955a960375d.preview.emergentagent.com"
     tester = ESEBAPITester(base_url)
     
-    print("\n===== TESTING AUTOMATIC PDF GENERATION WORKFLOW =====")
+    print("\n===== TESTING CORRECTIONS FOR EBS INTERFACE =====")
     
     # Use the provided test accounts from the test scenario
     admin_email = "admin@eseb.com"
@@ -479,14 +479,17 @@ def main():
     admin_login = tester.test_login(admin_email, admin_password, "admin")
     
     if not admin_login:
-        print("❌ Admin login failed, cannot proceed with PDF generation test")
+        print("❌ Admin login failed, cannot proceed with test")
         return 1
     
-    print("\n===== CREATING NEW EBS REQUEST WITH COMPLETE DATA =====")
+    print("\n===== CREATING NEW EBS REQUEST WITH CORRECTED FIELDS =====")
+    print("✅ Testing: Matricule instead of date_naissance")
+    print("✅ Testing: Qualité EBS limited to EBS, ESEB, i-EBS")
+    print("✅ Testing: Apple Pencil without serial number requirement")
     
     # Create a new request with the specific test data
     data = {
-        "devices": ["ipad", "macbook", "apple_pencil"],
+        "devices": ["ipad", "apple_pencil"],  # Testing iPad + Apple Pencil combination
         "application_requirements": "Applications éducatives pour besoins spécifiques",
         "phone": "+352123456789",
         "address": "123 Rue de Luxembourg",
@@ -495,10 +498,10 @@ def main():
         "beneficiaire": {
             "nom": "Dupont",
             "prenom": "Jean",
-            "date_naissance": "2010-05-15",
+            "matricule": "20241234567",  # Using matricule instead of date_naissance
             "ecole": "École Test Luxembourg",
             "classe": "6e année",
-            "qualite_ebs": "EBS",
+            "qualite_ebs": "i-EBS",  # Testing i-EBS option
             "personne_reference": "Marie Dupont"
         }
     }
