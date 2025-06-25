@@ -228,8 +228,8 @@ def generate_official_ebs_pdf(request_data: dict, user_data: dict) -> bytes:
     profit_data = [
         ["Au profit de", ""],
         ["Nom et Prénom", f"{beneficiaire.get('prenom', '')} {beneficiaire.get('nom', '')}"],
-        ["Qualité EBS (ESS, ESEB)", beneficiaire.get('qualite_ebs', 'EBS')],
-        ["Date de naissance", beneficiaire.get('date_naissance', '')],
+        ["Qualité EBS (EBS, ESEB, i-EBS)", beneficiaire.get('qualite_ebs', 'EBS')],
+        ["Matricule", beneficiaire.get('matricule', '')],
         ["École (si applicable)", beneficiaire.get('ecole', '')],
         ["Classe (si applicable)", beneficiaire.get('classe', '')],
         ["Personne de référence (si applicable)", beneficiaire.get('personne_reference', '')]
