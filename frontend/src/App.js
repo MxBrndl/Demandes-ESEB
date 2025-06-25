@@ -933,6 +933,30 @@ const MyRequestsView = ({ currentUser, setCurrentView, setError }) => {
                     </div>
                   </div>
                 )}
+                {/* Show PDF generation status */}
+                {request.official_pdf_generated && (
+                  <div className="mt-4">
+                    <h4 className="font-medium text-gray-900 mb-2">PDF Officiel:</h4>
+                    <div className="bg-green-50 p-3 rounded border-l-4 border-green-400 flex items-center justify-between">
+                      <div>
+                        <span className="text-green-800 font-medium">✅ PDF officiel généré automatiquement</span>
+                        {request.pdf_generated_at && (
+                          <p className="text-green-600 text-sm">
+                            Généré le {new Date(request.pdf_generated_at).toLocaleDateString('fr-FR')} à {new Date(request.pdf_generated_at).toLocaleTimeString('fr-FR')}
+                          </p>
+                        )}
+                      </div>
+                      <button
+                        onClick={() => downloadPDF(request._id)}
+                        className="bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700 transition-colors text-sm"
+                      >
+                        📄 Télécharger PDF Officiel
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Show device details if available */}
                 {(request.device_serial_numbers || request.device_asset_tags) && (
                   <div className="mt-4">
                     <h4 className="font-medium text-gray-900 mb-2">Détails des appareils:</h4>
