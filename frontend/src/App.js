@@ -788,13 +788,16 @@ const MyRequestsView = ({ currentUser, setCurrentView, setError }) => {
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `EBS_demande_${requestId}.pdf`;
+      a.download = `EBS_demande_officielle_${requestId}.pdf`;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
+      
+      console.log('PDF téléchargé avec succès');
     } catch (error) {
-      setError('Erreur lors du téléchargement du PDF');
+      console.error('Erreur téléchargement PDF:', error);
+      setError('Erreur lors du téléchargement du PDF: ' + (error.response?.data?.detail || error.message));
     }
   };
 
