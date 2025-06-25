@@ -462,7 +462,69 @@ async def get_current_user(token_data: dict = Depends(verify_token)):
         "role": user["role"]
     }
 
-# Device request endpoints
+# User management endpoints (Admin only)
+@app.get("/api/users")
+async def get_all_users(token_data: dict = Depends(require_admin)):
+    """Get all users for admin management"""
+    users = list(users_collection.find({}, {"password": 0}))  # Exclude password
+    return {"users": users}
+
+@app.get("/api/users/{user_id}")
+async def get_user(user_id: str, token_data: dict = Depends(require_admin)):
+    """Get specific user details"""
+    user = users_collection.find_one({"_id": user_id}, {"password": 0})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    return user
+
+@app.put("/api/users/{user_id}")
+async def update_user(user_id: str, update_data: dict, token_data: dict = Depends(require_admin)):
+    """Update user information"""
+    user = users_collection.find_one({"_id": user_id})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Prepare update fields
+    update_fields = {"updated_at": datetime.utcnow().isoformat()}
+    
+    if update_data.get("email"):
+        # Check if email already exists for another user
+        existing = users_collection.find_one({"email": update_data["email"], "_id": {"$ne": user_id}})
+        if existing:
+            raise HTTPException(status_code=400, detail="Email already in use")
+        update_fields["email"] = update_data["email"]
+    
+    for field in ["first_name", "last_name", "role", "fonction", "adresse_complete", "telephone"]:
+        if update_data.get(field):
+            update_fields[field] = update_data[field]
+    
+    if update_data.get("password"):
+        update_fields["password"] = hash_password(update_data["password"])
+    
+    users_collection.update_one({"_id": user_id}, {"$set": update_fields})
+    
+    return {"message": "User updated successfully"}
+
+@app.delete("/api/users/{user_id}")
+async def delete_user(user_id: str, token_data: dict = Depends(require_admin)):
+    """Delete user - Admin only"""
+    if user_id == token_data["user_id"]:
+        raise HTTPException(status_code=400, detail="Cannot delete yourself")
+    
+    user = users_collection.find_one({"_id": user_id})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Delete user's requests as well
+    requests_collection.delete_many({"user_id": user_id})
+    
+    # Delete user
+    result = users_collection.delete_one({"_id": user_id})
+    
+    if result.deleted_count == 1:
+        return {"message": "User and associated requests deleted successfully"}
+    else:
+        raise HTTPException(status_code=500, detail="Failed to delete user")
 @app.post("/api/requests")
 async def create_request(request_data: DeviceRequest, token_data: dict = Depends(verify_token)):
     # Get user info
