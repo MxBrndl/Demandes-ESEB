@@ -55,20 +55,30 @@ class ESEBAPITester:
             print(f"❌ Failed - Error: {str(e)}")
             return False, {}
 
-    def test_register_user(self, email, password, first_name, last_name, role):
-        """Test user registration"""
+    def test_register_user(self, email, password, first_name, last_name, role, fonction=None, adresse_complete=None, telephone=None):
+        """Test user registration with extended fields"""
+        data = {
+            "email": email,
+            "password": password,
+            "first_name": first_name,
+            "last_name": last_name,
+            "role": role
+        }
+        
+        # Add extended fields if provided
+        if fonction:
+            data["fonction"] = fonction
+        if adresse_complete:
+            data["adresse_complete"] = adresse_complete
+        if telephone:
+            data["telephone"] = telephone
+            
         success, response = self.run_test(
-            f"Register {role}",
+            f"Register {role} with extended fields",
             "POST",
             "register",
             200,
-            data={
-                "email": email,
-                "password": password,
-                "first_name": first_name,
-                "last_name": last_name,
-                "role": role
-            }
+            data=data
         )
         
         if success and 'token' in response:
