@@ -237,41 +237,77 @@ class ESEBAPITester:
         
         return False
 
-    def test_update_request_without_serial_for_ipad(self, request_id):
-        """Test updating a request without serial number for iPad"""
+    def test_update_request_without_serial_for_required_devices(self, request_id):
+        """Test updating a request without serial number for iPad or MacBook"""
         if not self.admin_token or not request_id:
             print("❌ No admin token or request ID available")
             return False
         
-        data = {
+        # Test missing iPad serial
+        data_ipad = {
             "status": "approuve",
             "device_asset_tags": {
                 "ipad": "H12345",
-                "apple_pencil": "H67890"
+                "macbook": "H67890",
+                "apple_pencil": "H11111"
             },
             "device_serial_numbers": {
                 "ipad": "",  # Empty serial for iPad
+                "macbook": "MACBOOK987654321",
                 "apple_pencil": ""
             },
             "admin_notes": "Tentative sans numéro de série pour iPad."
         }
         
-        success, response = self.run_test(
+        success_ipad, response_ipad = self.run_test(
             "Update request without iPad serial number",
             "PUT",
             f"requests/{request_id}",
             400,  # Expecting error
-            data=data,
+            data=data_ipad,
             token=self.admin_token
         )
         
         # This test passes if it fails with status 400
-        if not success and response.get('detail', '').find('Numéro de série obligatoire') >= 0:
+        ipad_test_passed = False
+        if not success_ipad and response_ipad.get('detail', '').find('Numéro de série obligatoire') >= 0:
             self.tests_passed += 1
             print(f"✅ Correctly rejected missing serial number for iPad")
-            return True
+            ipad_test_passed = True
         
-        return False
+        # Test missing MacBook serial
+        data_macbook = {
+            "status": "approuve",
+            "device_asset_tags": {
+                "ipad": "H12345",
+                "macbook": "H67890",
+                "apple_pencil": "H11111"
+            },
+            "device_serial_numbers": {
+                "ipad": "IPAD123456789",
+                "macbook": "",  # Empty serial for MacBook
+                "apple_pencil": ""
+            },
+            "admin_notes": "Tentative sans numéro de série pour MacBook."
+        }
+        
+        success_macbook, response_macbook = self.run_test(
+            "Update request without MacBook serial number",
+            "PUT",
+            f"requests/{request_id}",
+            400,  # Expecting error
+            data=data_macbook,
+            token=self.admin_token
+        )
+        
+        # This test passes if it fails with status 400
+        macbook_test_passed = False
+        if not success_macbook and response_macbook.get('detail', '').find('Numéro de série obligatoire') >= 0:
+            self.tests_passed += 1
+            print(f"✅ Correctly rejected missing serial number for MacBook")
+            macbook_test_passed = True
+        
+        return ipad_test_passed and macbook_test_passed
 
     def test_get_dashboard_stats(self):
         """Test getting dashboard stats as admin"""
