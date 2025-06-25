@@ -134,21 +134,31 @@ class ESEBAPITester:
         return False
 
     def test_create_request(self, token, user_id, role):
-        """Test creating a device request"""
+        """Test creating a device request with beneficiary information"""
         if not token:
             print(f"❌ No {role} token available")
             return False
         
         data = {
-            "user_id": user_id,
             "devices": ["ipad", "macbook", "apple_pencil"],
             "application_requirements": "Besoin d'applications pour prendre des notes et dessiner. Logiciels de programmation pour le MacBook.",
             "phone": "+33987654321",
-            "address": "123 Rue de l'École, Luxembourg"
+            "address": "123 Rue de l'École, Luxembourg",
+            "lieu_reception": "Centre Technolink",
+            "duree_fin_disposition": "Fin d'année scolaire",
+            "beneficiaire": {
+                "nom": "Dupont",
+                "prenom": "Jean",
+                "date_naissance": "2010-05-15",
+                "ecole": "École Fondamentale de Luxembourg",
+                "classe": "6e année",
+                "qualite_ebs": "EBS",
+                "personne_reference": "Marie Dupont"
+            }
         }
         
         success, response = self.run_test(
-            f"Create request as {role}",
+            f"Create request as {role} with beneficiary info",
             "POST",
             "requests",
             200,
